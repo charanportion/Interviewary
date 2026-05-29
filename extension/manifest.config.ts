@@ -8,6 +8,12 @@ export default defineManifest({
     'Live transcription + AI follow-up questions for technical interviews on Google Meet.',
   version: pkg.version,
   permissions: ['tabCapture', 'activeTab', 'sidePanel', 'storage'],
+  icons: {
+    16: 'public/icons/icon-16.png',
+    32: 'public/icons/icon-32.png',
+    48: 'public/icons/icon-48.png',
+    128: 'public/icons/icon-128.png',
+  },
   // Direct browser calls to Deepgram (STT) and the LLM providers. Declaring
   // these grants the extension cross-origin privileges, so the browser does not
   // enforce CORS on these hosts.
@@ -30,6 +36,12 @@ export default defineManifest({
   },
   action: {
     default_title: 'Open Interviewary',
+    default_icon: {
+      16: 'public/icons/icon-16.png',
+      32: 'public/icons/icon-32.png',
+      48: 'public/icons/icon-48.png',
+      128: 'public/icons/icon-128.png',
+    },
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',

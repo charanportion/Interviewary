@@ -1,0 +1,6 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Interviewary">
+  <!-- Brand mark: ink rounded square with a serif "I" (Fraunces-inspired).
+       Monochrome ink-on-paper — matches the landing palette. -->
+  <rect width="128" height="128" rx="28" fill="#1b1814"/>
+  <path d="M40 33 H88 V45 H73 V83 H88 V95 H40 V83 H55 V45 H40 Z" fill="#faf8f4"/>
+</svg>

@@ -1,7 +1,7 @@
 import { Reveal } from './Reveal';
 import { ChevronIcon } from './icons';
 
-const FAQS: { q: string; a: string }[] = [
+export const FAQS: { q: string; a: string }[] = [
   {
     q: 'Where does my data go?',
     a: 'Your interview content stays with you: audio, transcripts, and résumés are processed in your browser and sent only to your own Deepgram and LLM accounts, and your keys live in local storage. The only things we collect are the email you give us to download and — if you opt in — anonymous usage stats (never transcripts or answers). Full details are in our Privacy Policy.',

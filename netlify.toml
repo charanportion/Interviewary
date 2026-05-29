@@ -18,3 +18,7 @@
 #   SUPABASE_URL                 — server-only, used by the API routes
 #   SUPABASE_SERVICE_ROLE_KEY    — server-only secret
 #   VITE_ANALYTICS_ENDPOINT      — baked into the extension build (e.g. https://your-domain.com/api/events)
+# Optional:
+#   NEXT_PUBLIC_SITE_URL         — canonical origin for SEO (canonical tags, OG image,
+#                                  sitemap, robots). Defaults to https://interviewary.dotportion.com
+#                                  if unset; override only when deploying to a different domain.
