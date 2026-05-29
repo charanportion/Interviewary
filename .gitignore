@@ -7,3 +7,11 @@ build/
 .env
 .env.local
 *.tsbuildinfo
+
+# Next.js (landing)
+landing/.next/
+landing/out/
+next-env.d.ts
+
+# Landing — generated downloadable extension bundle
+landing/public/interviewary-extension.zip

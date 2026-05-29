@@ -1,0 +1,63 @@
+import { Reveal } from './Reveal';
+
+const STEPS = [
+  {
+    n: '01',
+    title: 'Upload & configure',
+    time: '~1 min',
+    body: 'Open the side panel in Google Meet, drop in the job description and résumé, pick seniority and interview type. You get 5–7 tailored opening questions — each with a note on what a strong answer sounds like.',
+  },
+  {
+    n: '02',
+    title: 'Ask and watch',
+    time: 'live',
+    body: 'Run the interview normally. Interviewary transcribes both sides, splitting interviewer from candidate, so you never lose the thread of the conversation.',
+  },
+  {
+    n: '03',
+    title: 'Read the answer, instantly',
+    time: '~2 s',
+    body: 'The moment the candidate stops talking, you get a rating — Weak, Adequate, Strong, Exceptional — with a one-line reason, plus 2–3 follow-up questions that probe what they just said.',
+  },
+  {
+    n: '04',
+    title: 'Download the report',
+    time: '~1 min',
+    body: 'Click End interview and get a markdown report: summary, every Q&A with its evaluation, strengths, concerns, and a hire / no-hire recommendation — ready to share with the team.',
+  },
+];
+
+export function HowItWorks() {
+  return (
+    <section id="how" className="bg-[var(--color-paper-sunk)]">
+      <div className="section section-pad">
+        <Reveal className="max-w-2xl">
+          <div className="label-eyebrow mb-3">How it works</div>
+          <h2 className="display text-[30px] font-semibold leading-tight text-ink sm:text-[38px]">
+            From “hello” to a hiring decision, without leaving the call.
+          </h2>
+        </Reveal>
+
+        <div className="mt-12 grid gap-4 sm:grid-cols-2">
+          {STEPS.map((s, i) => (
+            <Reveal key={s.n} delay={i * 70}>
+              <div className="card flex h-full flex-col p-6 transition-shadow duration-200 hover:shadow-[var(--shadow-pop)]">
+                <div className="mb-4 flex items-center justify-between">
+                  <span
+                    className="display text-[26px] font-semibold"
+                    style={{ color: 'var(--color-accent)' }}
+                  >
+                    {s.n}
+                  </span>
+                  <span className="chip chip-topic">{s.time}</span>
+                </div>
+                <h3 className="text-[17px] font-semibold text-ink">{s.title}</h3>
+                <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">{s.body}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}

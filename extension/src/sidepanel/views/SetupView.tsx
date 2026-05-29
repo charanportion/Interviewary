@@ -2,8 +2,9 @@ import { useState, useCallback } from 'react';
 import type { DragEvent } from 'react';
 import { useStore } from '../store';
 import { parseFile } from '../../lib/parse';
-import { send, sendBinary } from '../../lib/ws';
+import { startInterview, pushAudio } from '../../lib/engine';
 import { startAudio, stopAudio } from '../../lib/audio';
+import { hasValidSettings } from '../../lib/settings';
 import type { InterviewType, Seniority } from '@interview-copilot/shared';
 
 type UploadKind = 'jd' | 'resume';
@@ -24,19 +25,27 @@ export function SetupView() {
   const audioError = useStore((s) => s.audioError);
   const setAudioStatus = useStore((s) => s.setAudioStatus);
 
+  const settings = useStore((s) => s.settings);
+  const openSettings = useStore((s) => s.openSettings);
+  const keysReady = hasValidSettings(settings);
+
   const canStart =
+    keysReady &&
     jd.trim().length > 0 &&
     resume.trim().length > 0 &&
     audioStatus !== 'starting';
 
   async function handleStart() {
+    if (!hasValidSettings(settings)) {
+      openSettings();
+      return;
+    }
+
     setAudioStatus('starting');
 
     try {
       await startAudio({
-        onChunk: (blob) => {
-          blob.arrayBuffer().then((buf) => sendBinary(buf));
-        },
+        onChunk: (blob) => pushAudio(blob),
         onError: (err) => {
           setAudioStatus('error', err.message);
           stopAudio();
@@ -49,31 +58,37 @@ export function SetupView() {
     }
 
     setAudioStatus('capturing');
-    send({
-      type: 'START_INTERVIEW',
-      jd,
-      resume,
-      seniority,
-      interviewType,
-    });
+    startInterview({ jd, resume, seniority, interviewType }, settings);
   }
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <Uploader
-        label="Job description"
-        kind="jd"
-        text={jd}
-        fileName={jdFileName}
-        onParsed={setJd}
-      />
-      <Uploader
-        label="Candidate resume"
-        kind="resume"
-        text={resume}
-        fileName={resumeFileName}
-        onParsed={setResume}
-      />
+      <div>
+        <h2 className="display text-xl font-semibold text-ink">New interview</h2>
+        <p className="mt-0.5 text-[13px] text-muted">
+          Add the role and résumé, then start. Questions and live feedback appear as the
+          candidate speaks.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <Uploader
+          label="Job description"
+          step={1}
+          kind="jd"
+          text={jd}
+          fileName={jdFileName}
+          onParsed={setJd}
+        />
+        <Uploader
+          label="Candidate résumé"
+          step={2}
+          kind="resume"
+          text={resume}
+          fileName={resumeFileName}
+          onParsed={setResume}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Select
@@ -98,16 +113,27 @@ export function SetupView() {
       </div>
 
       {audioStatus === 'error' && audioError && (
-        <p className="rounded-md border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700">
+        <p className="rounded-lg border border-[color-mix(in_srgb,var(--color-weak)_30%,transparent)] bg-weak-bg p-2.5 text-xs leading-relaxed text-weak">
           {audioError}
         </p>
+      )}
+
+      {!keysReady && (
+        <button
+          type="button"
+          onClick={openSettings}
+          className="rounded-lg border border-[color-mix(in_srgb,var(--color-adequate)_35%,transparent)] bg-adequate-bg p-2.5 text-left text-xs leading-relaxed text-adequate transition hover:brightness-[0.98]"
+        >
+          Add your Deepgram and LLM API keys in <strong>Settings</strong> before starting.
+          Tap to configure →
+        </button>
       )}
 
       <button
         type="button"
         disabled={!canStart}
         onClick={handleStart}
-        className="mt-auto rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
+        className="btn btn-primary btn-md mt-auto w-full"
       >
         {audioStatus === 'starting' ? 'Starting…' : 'Start interview'}
       </button>
@@ -117,13 +143,14 @@ export function SetupView() {
 
 interface UploaderProps {
   label: string;
+  step: number;
   kind: UploadKind;
   text: string;
   fileName: string | undefined;
   onParsed: (text: string, fileName?: string) => void;
 }
 
-function Uploader({ label, kind, text, fileName, onParsed }: UploaderProps) {
+function Uploader({ label, step, kind, text, fileName, onParsed }: UploaderProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -161,22 +188,25 @@ function Uploader({ label, kind, text, fileName, onParsed }: UploaderProps) {
     if (file) void handleFile(file);
   }
 
+  const done = !!text;
+
   return (
-    <section className="flex flex-col gap-1">
-      <label className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-        {label}
-      </label>
+    <section className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <StepDot n={step} done={done} />
+        <span className="label-eyebrow">{label}</span>
+      </div>
       <label
         htmlFor={`upload-${kind}`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed px-3 py-4 text-center text-sm transition ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-3 py-5 text-center text-sm transition ${
           dragOver
-            ? 'border-indigo-400 bg-indigo-50'
-            : text
-              ? 'border-emerald-300 bg-emerald-50'
-              : 'border-neutral-300 bg-white hover:border-neutral-400'
+            ? 'border-accent bg-accent-soft'
+            : done
+              ? 'border-[color-mix(in_srgb,var(--color-strong)_45%,transparent)] bg-strong-bg'
+              : 'border-line-strong bg-surface hover:border-muted'
         }`}
       >
         <input
@@ -190,25 +220,22 @@ function Uploader({ label, kind, text, fileName, onParsed }: UploaderProps) {
           }}
         />
         {pending ? (
-          <span className="text-neutral-600">Parsing…</span>
-        ) : text ? (
-          <span className="text-emerald-700">
-            <strong>{fileName ?? 'Uploaded'}</strong> ·{' '}
-            {text.length.toLocaleString()} chars
+          <span className="text-muted">Parsing…</span>
+        ) : done ? (
+          <span className="font-medium text-strong">
+            {fileName ?? 'Uploaded'} · {text.length.toLocaleString()} chars
           </span>
         ) : (
-          <span className="text-neutral-500">
-            Drop a PDF or DOCX here, or click to select
-          </span>
+          <span className="text-muted">Drop a PDF or DOCX, or click to choose</span>
         )}
       </label>
 
-      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {error && <p className="text-xs text-weak">{error}</p>}
 
-      {text && (
+      {done && (
         <button
           type="button"
-          className="self-start text-xs text-indigo-600 hover:underline"
+          className="self-start text-[11px] font-semibold text-accent hover:underline"
           onClick={() => setPreviewOpen((v) => !v)}
         >
           {previewOpen ? 'Hide preview' : 'Show preview'}
@@ -216,12 +243,24 @@ function Uploader({ label, kind, text, fileName, onParsed }: UploaderProps) {
       )}
 
       {previewOpen && (
-        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md border border-neutral-200 bg-neutral-50 p-2 text-xs text-neutral-700">
+        <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-line bg-paper-sunk p-2.5 text-xs leading-relaxed text-ink-soft">
           {text.slice(0, 4000)}
           {text.length > 4000 ? '\n…' : ''}
         </pre>
       )}
     </section>
+  );
+}
+
+function StepDot({ n, done }: { n: number; done: boolean }) {
+  return (
+    <span
+      className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+        done ? 'bg-strong text-white' : 'bg-paper-sunk text-muted'
+      }`}
+    >
+      {done ? '✓' : n}
+    </span>
   );
 }
 
@@ -234,14 +273,12 @@ interface SelectProps {
 
 function Select({ label, value, options, onChange }: SelectProps) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-        {label}
-      </span>
+    <label className="flex flex-col gap-1.5">
+      <span className="label-eyebrow">{label}</span>
       <select
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
-        className="rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+        className="field-input"
       >
         {options.map(([v, l]) => (
           <option key={v} value={v}>

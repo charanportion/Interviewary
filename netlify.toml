@@ -1,0 +1,20 @@
+# Netlify deploy config for the Interviewary landing page (Next.js).
+# The build first produces a fresh extension bundle (zipped into landing/public)
+# so the site's Download button serves the current build, then builds Next.js.
+# The Next.js runtime plugin turns the API routes (/api/leads, /api/events) into
+# serverless functions.
+
+[build]
+  command = "pnpm install --frozen-lockfile=false && pnpm --filter @interview-copilot/landing build"
+  publish = "landing/.next"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Required env vars (set in Site settings → Environment variables):
+#   SUPABASE_URL                 — server-only, used by the API routes
+#   SUPABASE_SERVICE_ROLE_KEY    — server-only secret
+#   VITE_ANALYTICS_ENDPOINT      — baked into the extension build (e.g. https://your-domain.com/api/events)

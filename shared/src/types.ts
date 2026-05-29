@@ -6,6 +6,25 @@ export type InterviewType = 'screening' | 'deep_dive';
 export type Speaker = 'interviewer' | 'candidate';
 export type Rating = 'weak' | 'adequate' | 'strong' | 'exceptional';
 
+// ───────── BYO-key settings (stored client-side in chrome.storage.local) ─────────
+// The extension is fully serverless: the user supplies their own Deepgram key
+// and an LLM provider + key + models. Nothing is hosted by us.
+export type LlmProvider = 'anthropic' | 'openai' | 'google' | 'xai';
+
+export interface AppSettings {
+  deepgramKey: string;
+  provider: LlmProvider;
+  llmKey: string;
+  // Model id used for the live agents (suggestions + evaluation). Must be fast
+  // enough to keep the ~2s latency budget.
+  fastModel: string;
+  // Model id used for the one-shot end-of-call report. Quality over latency.
+  reportModel: string;
+  // Opt-in (default false): send anonymous usage events (no transcripts,
+  // answers, keys, or candidate data) to help improve the product.
+  analyticsConsent?: boolean;
+}
+
 export interface TranscriptTurn {
   id: string;
   speaker: Speaker;

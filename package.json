@@ -4,9 +4,10 @@
   "private": true,
   "description": "Chrome extension copilot for technical interviews — 2-week prototype",
   "scripts": {
-    "dev": "pnpm -r --parallel --stream dev",
-    "dev:backend": "pnpm --filter @interview-copilot/backend dev",
+    "dev": "pnpm --filter @interview-copilot/extension dev",
     "dev:extension": "pnpm --filter @interview-copilot/extension dev",
+    "dev:landing": "pnpm --filter @interview-copilot/landing dev",
+    "package:extension": "pnpm --filter @interview-copilot/extension build && node landing/scripts/package-extension.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },

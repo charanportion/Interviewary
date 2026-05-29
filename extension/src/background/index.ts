@@ -1,6 +1,6 @@
 // Visible-at-startup log: if you don't see this in the SW DevTools console,
 // the SW didn't load. (Open chrome://extensions → "service worker" link on
-// the Interview Copilot card to see SW logs.)
+// the Interviewary card to see SW logs.)
 console.log('[bg] service worker loaded');
 
 // CRITICAL: Chrome remembers setPanelBehavior across SW restarts and even

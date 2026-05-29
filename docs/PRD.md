@@ -1,4 +1,4 @@
-# PRD — Interview Copilot Prototype
+# PRD — Interviewary Prototype
 
 ## Problem
 

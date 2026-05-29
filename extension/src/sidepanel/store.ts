@@ -1,15 +1,16 @@
 import { create } from 'zustand';
 import type {
   AnswerEvaluation,
+  AppSettings,
   InterviewType,
   Seniority,
   ServerMessage,
   SuggestedQuestion,
   TranscriptTurn,
 } from '@interview-copilot/shared';
+import { emptySettings, hasValidSettings } from '../lib/settings';
 
-export type Phase = 'setup' | 'interview';
-export type WsStatus = 'disconnected' | 'connecting' | 'open' | 'closed';
+export type Phase = 'setup' | 'interview' | 'settings' | 'report';
 export type AudioStatus = 'idle' | 'starting' | 'capturing' | 'error';
 export type ReportStatus = 'idle' | 'generating';
 
@@ -31,8 +32,11 @@ export interface AppState {
   evaluations: AnswerEvaluation[];
   askedQuestionIds: string[];
 
-  // ws
-  wsStatus: WsStatus;
+  // BYO-key settings (loaded from chrome.storage.local on startup)
+  settings: AppSettings;
+  settingsLoaded: boolean;
+  // Where to return when leaving the settings screen ('setup' or 'interview').
+  settingsReturnPhase: Exclude<Phase, 'settings'>;
 
   // audio
   audioStatus: AudioStatus;
@@ -48,15 +52,25 @@ export interface AppState {
   // Are we currently waiting for the end-of-call report to come back?
   reportStatus: ReportStatus;
 
+  // The finished report. Kept (along with the session data) so the report
+  // screen can render charts + narrative; cleared on finishReport().
+  reportMarkdown?: string;
+  reportGeneratedAtMs?: number;
+
   // setters
   setJd: (text: string, fileName?: string) => void;
   setResume: (text: string, fileName?: string) => void;
   setSeniority: (s: Seniority) => void;
   setInterviewType: (t: InterviewType) => void;
-  setWsStatus: (s: WsStatus) => void;
   setAudioStatus: (s: AudioStatus, error?: string) => void;
   setReportStatus: (s: ReportStatus) => void;
   dismissError: (index: number) => void;
+
+  // settings
+  setSettings: (s: AppSettings) => void;
+  applyLoadedSettings: (s: AppSettings) => void;
+  openSettings: () => void;
+  closeSettings: () => void;
 
   // server message dispatch (called by ws client)
   handleServerMessage: (msg: ServerMessage) => void;
@@ -64,6 +78,8 @@ export interface AppState {
   // setup actions
   markAsked: (questionId: string) => void;
   resetSession: () => void;
+  // Leave the report screen and start fresh.
+  finishReport: () => void;
   beginInterview: () => void;
 }
 
@@ -74,6 +90,8 @@ const initialSessionState = {
   suggestedQuestions: [] as SuggestedQuestion[],
   evaluations: [] as AnswerEvaluation[],
   askedQuestionIds: [] as string[],
+  reportMarkdown: undefined as string | undefined,
+  reportGeneratedAtMs: undefined as number | undefined,
 };
 
 export const useStore = create<AppState>((set, get) => ({
@@ -85,7 +103,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   ...initialSessionState,
 
-  wsStatus: 'disconnected',
+  settings: emptySettings(),
+  settingsLoaded: false,
+  settingsReturnPhase: 'setup',
   audioStatus: 'idle',
   audioError: undefined,
   serverErrors: [],
@@ -96,13 +116,31 @@ export const useStore = create<AppState>((set, get) => ({
   setResume: (text, fileName) => set({ resume: text, resumeFileName: fileName }),
   setSeniority: (s) => set({ seniority: s }),
   setInterviewType: (t) => set({ interviewType: t }),
-  setWsStatus: (s) => set({ wsStatus: s }),
   setAudioStatus: (s, error) => set({ audioStatus: s, audioError: error }),
   setReportStatus: (s) => set({ reportStatus: s }),
   dismissError: (index) =>
     set((state) => ({
       serverErrors: state.serverErrors.filter((_, i) => i !== index),
     })),
+
+  setSettings: (s) => set({ settings: s }),
+
+  // Called once on startup after reading chrome.storage.local. If keys are
+  // missing we land on the settings screen; otherwise the normal setup screen.
+  applyLoadedSettings: (s) =>
+    set((state) => ({
+      settings: s,
+      settingsLoaded: true,
+      phase: hasValidSettings(s) ? state.phase : 'settings',
+    })),
+
+  openSettings: () =>
+    set((state) => ({
+      phase: 'settings',
+      settingsReturnPhase: state.phase === 'settings' ? state.settingsReturnPhase : state.phase,
+    })),
+
+  closeSettings: () => set((state) => ({ phase: state.settingsReturnPhase })),
 
   beginInterview: () =>
     set({
@@ -111,6 +149,17 @@ export const useStore = create<AppState>((set, get) => ({
     }),
 
   resetSession: () =>
+    set({
+      phase: 'setup',
+      ...initialSessionState,
+      audioStatus: 'idle',
+      audioError: undefined,
+      serverErrors: [],
+      newQuestionIds: [],
+      reportStatus: 'idle',
+    }),
+
+  finishReport: () =>
     set({
       phase: 'setup',
       ...initialSessionState,
@@ -194,12 +243,13 @@ export const useStore = create<AppState>((set, get) => ({
         return;
       }
       case 'REPORT_READY': {
-        downloadMarkdown(msg.markdown);
+        // Keep the session data; show it on the report screen with charts +
+        // narrative and explicit download buttons (no auto-download).
         set({
-          phase: 'setup',
-          ...initialSessionState,
-          audioStatus: 'idle',
-          audioError: undefined,
+          reportMarkdown: msg.markdown,
+          reportGeneratedAtMs: Date.now(),
+          reportStatus: 'idle',
+          phase: 'report',
         });
         return;
       }
@@ -217,16 +267,3 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 }));
-
-function downloadMarkdown(markdown: string): void {
-  const today = new Date().toISOString().slice(0, 10);
-  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `interview-${today}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}

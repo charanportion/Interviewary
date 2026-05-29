@@ -1,0 +1,322 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   Interviewary — marketing site
+   Reuses the extension's design system verbatim (warm-paper ground, ink type,
+   Fraunces display + Hanken Grotesk body, Prussian-blue accent) and extends it
+   with a few landing-only helpers (larger display scale, section frame, hero
+   wash, scroll reveal). Rating colors stay reserved as semantic signal and only
+   appear inside the side-panel mockups.
+   ========================================================================== */
+
+@theme {
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* Surfaces & ink */
+  --color-paper: #faf8f4;
+  --color-paper-sunk: #f3efe8;
+  --color-surface: #ffffff;
+  --color-ink: #1b1814;
+  --color-ink-soft: #463f36;
+  --color-muted: #8c8475;
+  --color-faint: #b4ab9b;
+  --color-line: #ece6db;
+  --color-line-strong: #ddd4c5;
+
+  /* Brand accent — Prussian blue, deliberately outside the rating hue set */
+  --color-accent: #1f4e79;
+  --color-accent-soft: #e8eef5;
+
+  /* Rating signal */
+  --color-weak: #b23a4b;
+  --color-weak-bg: #fbe9eb;
+  --color-adequate: #976400;
+  --color-adequate-bg: #faf0d7;
+  --color-strong: #1d7a52;
+  --color-strong-bg: #e2f3ea;
+  --color-exceptional: #4b3fb0;
+  --color-exceptional-bg: #ecebfa;
+
+  --radius-lg: 0.75rem;
+  --shadow-soft: 0 1px 2px rgb(27 24 20 / 0.04), 0 4px 12px rgb(27 24 20 / 0.05);
+  --shadow-pop: 0 2px 4px rgb(27 24 20 / 0.06), 0 10px 28px rgb(27 24 20 / 0.10);
+  --shadow-lift: 0 4px 8px rgb(27 24 20 / 0.05), 0 24px 60px rgb(27 24 20 / 0.12);
+}
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Offset anchor jumps so the sticky nav doesn't cover section headings. */
+  scroll-padding-top: 5.5rem;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Slim, unobtrusive scrollbars that match the paper ground */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-line-strong);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ----------------------------------------------------------------------------
+   Component layer — shared vocabulary lifted from the extension, plus the
+   marketing-scale primitives the landing page needs.
+   -------------------------------------------------------------------------- */
+@layer components {
+  .wordmark {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 580;
+    letter-spacing: -0.01em;
+    font-variation-settings: 'SOFT' 0, 'WONK' 0;
+  }
+
+  .display {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+  }
+
+  .label-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-muted;
+  }
+
+  /* Buttons -------------------------------------------------------------- */
+  .btn {
+    @apply inline-flex select-none items-center justify-center gap-2 rounded-lg
+      text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed;
+  }
+  .btn:focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    --tw-ring-color: var(--color-accent);
+    --tw-ring-offset-color: var(--color-paper);
+  }
+  .btn-lg {
+    @apply px-5 py-3 text-[15px];
+  }
+  .btn-md {
+    @apply px-4 py-2.5;
+  }
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-xs;
+  }
+  .btn-primary {
+    background-color: var(--color-ink);
+    @apply text-paper shadow-[var(--shadow-soft)];
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--color-ink-soft);
+    @apply -translate-y-px shadow-[var(--shadow-pop)];
+  }
+  .btn-primary:disabled {
+    background-color: var(--color-line-strong);
+    @apply text-faint shadow-none;
+  }
+  .btn-accent {
+    background-color: var(--color-accent);
+    @apply text-white shadow-[var(--shadow-soft)];
+  }
+  .btn-accent:hover:not(:disabled) {
+    @apply -translate-y-px shadow-[var(--shadow-pop)];
+    background-color: color-mix(in srgb, var(--color-accent) 88%, black);
+  }
+  .btn-secondary {
+    @apply border bg-surface text-ink-soft;
+    border-color: var(--color-line-strong);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    @apply bg-paper;
+    border-color: var(--color-muted);
+  }
+
+  /* Cards & chips -------------------------------------------------------- */
+  .card {
+    @apply rounded-xl border bg-surface shadow-[var(--shadow-soft)];
+    border-color: var(--color-line);
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
+  }
+  .chip-topic {
+    @apply bg-paper-sunk text-ink-soft;
+  }
+
+  /* Landing layout helpers ---------------------------------------------- */
+  .section {
+    @apply mx-auto w-full max-w-6xl px-6 sm:px-8;
+  }
+  .section-pad {
+    @apply py-20 sm:py-28;
+  }
+  .rule {
+    @apply border-t;
+    border-color: var(--color-line);
+  }
+
+  /* Long-form reading — privacy / terms / security pages -------------------- */
+  .prose {
+    @apply text-[15px] leading-relaxed text-ink-soft;
+  }
+  .prose > :first-child {
+    margin-top: 0;
+  }
+  .prose h2 {
+    @apply mb-2 mt-10 font-display text-[22px] font-semibold tracking-[-0.015em] text-ink;
+  }
+  .prose h3 {
+    @apply mb-1.5 mt-6 text-[16px] font-semibold text-ink;
+  }
+  .prose p {
+    @apply my-3;
+  }
+  .prose strong {
+    @apply font-semibold text-ink;
+  }
+  .prose a {
+    @apply font-medium underline decoration-1 underline-offset-2;
+    color: var(--color-accent);
+  }
+  .prose ul {
+    @apply my-3 flex list-disc flex-col gap-2 pl-5;
+  }
+  .prose ol {
+    @apply my-3 flex list-decimal flex-col gap-2 pl-5;
+  }
+  .prose li {
+    @apply pl-1 marker:text-faint;
+  }
+  .prose hr {
+    @apply my-8;
+    border-color: var(--color-line);
+  }
+  .prose code {
+    @apply rounded bg-paper-sunk px-1 py-0.5 text-[13px];
+  }
+
+  /* Form controls — lead-capture modal (mirrors the extension's .field-input) -- */
+  .field-input {
+    @apply w-full rounded-lg border bg-surface px-3 py-2.5 text-[15px] text-ink shadow-sm transition;
+    border-color: var(--color-line-strong);
+  }
+  .field-input::placeholder {
+    color: var(--color-faint);
+  }
+  .field-input:focus {
+    @apply outline-none ring-2;
+    border-color: var(--color-accent);
+    --tw-ring-color: var(--color-accent-soft);
+  }
+  .field-checkbox {
+    @apply h-4 w-4 shrink-0 rounded border;
+    accent-color: var(--color-accent);
+    border-color: var(--color-line-strong);
+  }
+}
+
+/* Hero / section background washes --------------------------------------- */
+.hero-wash {
+  background:
+    radial-gradient(58rem 38rem at 78% -8%, var(--color-accent-soft) 0%, transparent 58%),
+    radial-gradient(46rem 32rem at 6% 4%, #f6efe2 0%, transparent 55%);
+}
+
+/* Subtle dotted ground used behind product mockups */
+.dot-grid {
+  background-image: radial-gradient(var(--color-line-strong) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* Animations ------------------------------------------------------------- */
+@keyframes ia-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: ia-rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ia-rec {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+.animate-rec {
+  animation: ia-rec 1.6s ease-in-out infinite;
+}
+
+@keyframes ia-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+}
+.animate-flash {
+  animation: ia-flash 1.4s ease-out;
+}
+
+/* Scroll reveal — toggled by the useReveal IntersectionObserver hook. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-rec,
+  .animate-flash {
+    animation: none;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
