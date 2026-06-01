@@ -34,11 +34,22 @@ export interface InterviewSetup {
   interviewType: InterviewType;
 }
 
+// Transient orchestration state for the answer currently being evaluated. Opens
+// when a question is marked asked and accumulates the candidate's turns until the
+// next question is marked, so one evaluation is produced per asked question.
+interface AnswerWindow {
+  questionId: string; // the asked question this answer responds to
+  evalId: string; // stable id so re-evals of the growing answer update in place
+  anchorTurnId: string | null; // first candidate turn after the mark (badge anchor)
+  startIndex: number; // session.transcript.length at the moment the question was marked
+}
+
 interface EngineState {
   session: Session;
   settings: AppSettings;
   fastModel: LanguageModel;
   dg: DeepgramLiveSession | null;
+  answerWindow: AnswerWindow | null;
 }
 
 let state: EngineState | null = null;
@@ -62,7 +73,7 @@ export function startInterview(setup: InterviewSetup, settings: AppSettings): vo
   };
 
   const fastModel = getModel(settings, 'fast');
-  state = { session, settings, fastModel, dg: null };
+  state = { session, settings, fastModel, dg: null, answerWindow: null };
 
   // Only the candidate is transcribed — tab audio in the interviewer's browser
   // is the candidate's voice coming back through Meet.
@@ -113,30 +124,66 @@ function handleTurn(turn: TranscriptTurn): void {
   if (turn.speaker === 'candidate') runAgentsForTurn(turn);
 }
 
+// Minimum word count before an accumulated answer is worth evaluating. Below
+// this we wait — single words and short fragments are usually an answer still in
+// progress, and evaluating them produces misleading ratings.
+const MIN_ANSWER_WORDS = 10;
+
+function wordCount(text: string): number {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
 function runAgentsForTurn(turn: TranscriptTurn): void {
   if (!state) return;
-  const { session, fastModel, settings } = state;
 
-  // Best-guess question the candidate is responding to: the most recently
-  // "Mark asked"-flagged suggestion. Null → evaluator judges on its own merits.
-  const askedTexts = session.askedQuestionIds
-    .map((id) => session.suggestedQuestions.find((q) => q.id === id)?.text)
-    .filter((t): t is string => typeof t === 'string');
-  const questionAsked = askedTexts[askedTexts.length - 1] ?? null;
+  const evalPromise = evaluateCurrentAnswer(turn);
+  const followupPromise = generateFollowups(turn);
 
-  const allButCurrent = session.transcript.slice(0, -1);
-  const precedingContext = allButCurrent.slice(-4);
-  const recentTranscript = session.transcript.slice(-6);
+  Promise.all([evalPromise, followupPromise]).catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    emit({ type: 'ERROR', message: `Agent: ${message}` });
+  });
+}
 
-  const evalPromise = evaluateAnswer(
+// Evaluate the answer to the most recently marked question. We accumulate the
+// candidate's turns since the question was marked and (re-)evaluate the combined
+// answer in place, so there's one evaluation per asked question rather than one
+// per transcript turn. No marked question → no evaluation.
+function evaluateCurrentAnswer(turn: TranscriptTurn): Promise<unknown> {
+  if (!state) return Promise.resolve();
+  const { session, fastModel, settings, answerWindow } = state;
+  if (!answerWindow) return Promise.resolve();
+
+  // First candidate turn after the question was marked anchors the badge.
+  if (answerWindow.anchorTurnId === null) answerWindow.anchorTurnId = turn.id;
+  const anchorTurnId = answerWindow.anchorTurnId;
+
+  const answerText = session.transcript
+    .slice(answerWindow.startIndex)
+    .filter((t) => t.speaker === 'candidate')
+    .map((t) => t.text)
+    .join(' ');
+
+  // Too short to judge yet — wait for the candidate to say more.
+  if (wordCount(answerText) < MIN_ANSWER_WORDS) return Promise.resolve();
+
+  const questionAsked =
+    session.suggestedQuestions.find((q) => q.id === answerWindow.questionId)?.text ?? null;
+  const precedingContext = session.transcript.slice(0, answerWindow.startIndex).slice(-4);
+
+  emit({ type: 'EVAL_PENDING', turnId: anchorTurnId });
+
+  return evaluateAnswer(
     fastModel,
     {
       jd: session.jd,
       seniority: session.seniority,
       questionAsked,
-      candidateAnswer: turn.text,
+      candidateAnswer: answerText,
       precedingContext,
-      candidateTurnId: turn.id,
+      candidateTurnId: anchorTurnId,
+      evaluationId: answerWindow.evalId,
     },
     (evaluation) => {
       const idx = session.evaluations.findIndex((e) => e.id === evaluation.id);
@@ -151,8 +198,20 @@ function runAgentsForTurn(turn: TranscriptTurn): void {
       });
     },
   );
+}
 
-  const followupPromise = generateFollowupQuestions(
+// Followup question suggestions run on every candidate turn, regardless of
+// whether a question has been marked asked — they help the recruiter keep going.
+function generateFollowups(turn: TranscriptTurn): Promise<unknown> {
+  if (!state) return Promise.resolve();
+  const { session, fastModel } = state;
+
+  const askedTexts = session.askedQuestionIds
+    .map((id) => session.suggestedQuestions.find((q) => q.id === id)?.text)
+    .filter((t): t is string => typeof t === 'string');
+  const recentTranscript = session.transcript.slice(-6);
+
+  return generateFollowupQuestions(
     fastModel,
     {
       jd: session.jd,
@@ -172,11 +231,6 @@ function runAgentsForTurn(turn: TranscriptTurn): void {
       emit({ type: 'QUESTIONS_GENERATED', questions, replace: false });
     },
   );
-
-  Promise.all([evalPromise, followupPromise]).catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
-    emit({ type: 'ERROR', message: `Agent: ${message}` });
-  });
 }
 
 export function pushAudio(chunk: Blob | ArrayBuffer): void {
@@ -188,6 +242,18 @@ export function markQuestionAsked(questionId: string): void {
   if (!state.session.askedQuestionIds.includes(questionId)) {
     state.session.askedQuestionIds.push(questionId);
   }
+  // Open a fresh answer window: the candidate's turns from here on are this
+  // question's answer, evaluated as one in-place evaluation.
+  if (state.answerWindow?.questionId === questionId) return;
+  state.answerWindow = {
+    questionId,
+    evalId: crypto.randomUUID(),
+    anchorTurnId: null,
+    startIndex: state.session.transcript.length,
+  };
+  // Clear any stale "Evaluating…" hint from a prior window that never produced
+  // an evaluation (e.g. the previous answer stayed too short).
+  emit({ type: 'EVAL_PENDING', turnId: null });
 }
 
 export function endInterview(): void {

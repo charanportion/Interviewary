@@ -82,6 +82,10 @@ export type ServerMessage =
   | { type: 'TRANSCRIPT_TURN'; turn: TranscriptTurn }
   | { type: 'QUESTIONS_GENERATED'; questions: SuggestedQuestion[]; replace: boolean }
   | { type: 'EVALUATION'; evaluation: AnswerEvaluation }
+  // Signals which candidate turn (if any) currently has an evaluation in flight,
+  // so the side panel shows the "Evaluating…" hint on exactly that turn instead
+  // of on every un-evaluated turn. null clears it.
+  | { type: 'EVAL_PENDING'; turnId: string | null }
   | { type: 'REPORT_READY'; markdown: string }
   | { type: 'ERROR'; message: string }
   | { type: 'PONG' };

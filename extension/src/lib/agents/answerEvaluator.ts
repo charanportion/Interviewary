@@ -20,6 +20,11 @@ export interface EvaluateAnswerInput {
   // The turn this evaluation applies to. Used to link the eval back to its
   // candidate turn so the side panel renders the badge in the right place.
   candidateTurnId: string;
+  // Stable id for this evaluation. When the same answer is re-evaluated as the
+  // candidate keeps talking, passing the same id makes the extension overwrite
+  // the existing evaluation in place rather than appending a new one. If
+  // omitted, a fresh id is generated per call.
+  evaluationId?: string;
 }
 
 export async function evaluateAnswer(
@@ -35,9 +40,10 @@ export async function evaluateAnswer(
     prompt,
   });
 
-  // One id per evaluation call — partials stream with the same id so the
-  // extension overwrites in place rather than appending duplicates.
-  const id = crypto.randomUUID();
+  // One id per evaluation — partials stream with the same id so the extension
+  // overwrites in place rather than appending duplicates. The caller can supply
+  // a stable id so re-evaluations of a growing answer also overwrite in place.
+  const id = input.evaluationId ?? crypto.randomUUID();
   let latest: AnswerEvaluation | null = null;
 
   for await (const partial of partialObjectStream) {
@@ -110,7 +116,7 @@ For a ${input.seniority}-level candidate:
 - Do NOT inflate ratings. "Adequate" is a normal answer. Most answers should be adequate.
 - "Strong" and "exceptional" require specific evidence; if you can't point to a sentence, it's not strong.
 - For a junior candidate, "explained the concept correctly" can be strong. For a senior, the same answer is adequate.
-- If the answer is too short to evaluate (under ~10 words), rate it weak with evidence "answer too brief to evaluate."
+- This answer may be captured mid-response and re-evaluated as the candidate keeps talking. Evaluate what's present; don't penalize for in-progress brevity alone — judge on substance, not length.
 
 # Output
 

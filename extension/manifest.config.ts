@@ -27,7 +27,7 @@ export default defineManifest({
     'https://api.x.ai/*',
     // Opt-in anonymous usage analytics → the landing site's Next.js API route.
     // The route also returns permissive CORS, so this is belt-and-suspenders.
-    // TODO: narrow to the production domain once known (e.g. https://your-domain.com/*).
+    'https://interviewary.dotportion.com/*',
     'https://*.netlify.app/*',
   ],
   background: {

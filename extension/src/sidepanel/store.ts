@@ -31,6 +31,9 @@ export interface AppState {
   suggestedQuestions: SuggestedQuestion[];
   evaluations: AnswerEvaluation[];
   askedQuestionIds: string[];
+  // The candidate turn whose evaluation is currently in flight (anchors the
+  // "Evaluating…" hint in the transcript). null when nothing is pending.
+  pendingEvalTurnId: string | null;
 
   // BYO-key settings (loaded from chrome.storage.local on startup)
   settings: AppSettings;
@@ -90,6 +93,7 @@ const initialSessionState = {
   suggestedQuestions: [] as SuggestedQuestion[],
   evaluations: [] as AnswerEvaluation[],
   askedQuestionIds: [] as string[],
+  pendingEvalTurnId: null as string | null,
   reportMarkdown: undefined as string | undefined,
   reportGeneratedAtMs: undefined as number | undefined,
 };
@@ -233,13 +237,22 @@ export const useStore = create<AppState>((set, get) => ({
         }
         return;
       }
+      case 'EVAL_PENDING': {
+        set({ pendingEvalTurnId: msg.turnId });
+        return;
+      }
       case 'EVALUATION': {
         const s = get();
         const idx = s.evaluations.findIndex((e) => e.id === msg.evaluation.id);
         const next = [...s.evaluations];
         if (idx >= 0) next[idx] = msg.evaluation;
         else next.push(msg.evaluation);
-        set({ evaluations: next });
+        // The eval landed for the turn we were waiting on — hide the hint.
+        const clearPending = s.pendingEvalTurnId === msg.evaluation.candidateTurnId;
+        set({
+          evaluations: next,
+          ...(clearPending ? { pendingEvalTurnId: null } : {}),
+        });
         return;
       }
       case 'REPORT_READY': {

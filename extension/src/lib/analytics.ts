@@ -53,12 +53,21 @@ export interface TrackOptions {
  * configured. Fire-and-forget; never throws.
  */
 export async function track({ event, settings, sessionId, properties }: TrackOptions): Promise<void> {
-  if (!ENDPOINT) return;
-  if (!settings?.analyticsConsent) return;
+  if (!ENDPOINT) {
+    console.warn(
+      `[analytics] skip "${event}": no endpoint baked into this build ` +
+        '(VITE_ANALYTICS_ENDPOINT was empty when the extension was built).',
+    );
+    return;
+  }
+  if (!settings?.analyticsConsent) {
+    console.info(`[analytics] skip "${event}": consent is off (enable it in Settings).`);
+    return;
+  }
 
   try {
     const clientId = await getClientId();
-    await fetch(ENDPOINT, {
+    const res = await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -69,7 +78,12 @@ export async function track({ event, settings, sessionId, properties }: TrackOpt
       }),
       keepalive: true,
     });
+    if (res.ok) {
+      console.debug(`[analytics] sent "${event}" → ${ENDPOINT}`);
+    } else {
+      console.warn(`[analytics] "${event}" → ${res.status} ${res.statusText} from ${ENDPOINT}`);
+    }
   } catch (err) {
-    console.debug('[analytics] send failed (ignored):', err);
+    console.warn(`[analytics] send failed for "${event}" (ignored):`, err);
   }
 }

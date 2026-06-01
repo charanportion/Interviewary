@@ -6,6 +6,7 @@ import type { AnswerEvaluation, TranscriptTurn } from '@interview-copilot/shared
 export function TranscriptPanel() {
   const transcript = useStore((s) => s.transcript);
   const evaluations = useStore((s) => s.evaluations);
+  const pendingEvalTurnId = useStore((s) => s.pendingEvalTurnId);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,7 +28,12 @@ export function TranscriptPanel() {
     <div ref={scrollRef} className="h-full overflow-y-auto px-3 py-3">
       <ul className="flex flex-col gap-2.5">
         {transcript.map((turn) => (
-          <TurnRow key={turn.id} turn={turn} evaluation={evalByTurn.get(turn.id)} />
+          <TurnRow
+            key={turn.id}
+            turn={turn}
+            evaluation={evalByTurn.get(turn.id)}
+            pending={turn.id === pendingEvalTurnId}
+          />
         ))}
       </ul>
     </div>
@@ -37,9 +43,11 @@ export function TranscriptPanel() {
 function TurnRow({
   turn,
   evaluation,
+  pending,
 }: {
   turn: TranscriptTurn;
   evaluation: AnswerEvaluation | undefined;
+  pending: boolean;
 }) {
   const isInterviewer = turn.speaker === 'interviewer';
 
@@ -64,12 +72,12 @@ function TurnRow({
       </div>
       {evaluation ? (
         <EvalFooter evaluation={evaluation} />
-      ) : (
+      ) : pending ? (
         <div className="flex items-center gap-2 border-t border-line bg-paper-sunk/40 px-3 py-2 text-[11px] text-muted">
           <span className="h-1.5 w-1.5 animate-rec rounded-full bg-faint" />
           Evaluating answer…
         </div>
-      )}
+      ) : null}
     </li>
   );
 }
