@@ -17,7 +17,37 @@ import type { AppSettings } from '@interview-copilot/shared';
 
 export type ModelRole = 'fast' | 'report';
 
-export function getModel(settings: AppSettings, role: ModelRole): LanguageModel {
+// Server-mode context, obtained from POST /v1/session/start. When present (and
+// settings.accountMode === 'server') the agents talk to our metered LLM proxy
+// instead of the provider directly. Server mode runs on Anthropic: we point the
+// AI SDK's Anthropic provider at our proxy with the session token as the apiKey
+// (sent as x-api-key; the proxy swaps in our real Anthropic key) and tag the
+// request with the session id.
+export interface ServerModeContext {
+  serverUrl: string;
+  sessionToken: string;
+  sessionId: string;
+  fastModel: string;
+  reportModel: string;
+}
+
+export function getModel(
+  settings: AppSettings,
+  role: ModelRole,
+  server?: ServerModeContext,
+): LanguageModel {
+  if (settings.accountMode === 'server' && server) {
+    const modelId = role === 'fast' ? server.fastModel : server.reportModel;
+    return createAnthropic({
+      baseURL: `${server.serverUrl}/v1/llm`,
+      apiKey: server.sessionToken,
+      headers: {
+        'x-session-id': server.sessionId,
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+    })(modelId);
+  }
+
   const modelId = role === 'fast' ? settings.fastModel : settings.reportModel;
   const apiKey = settings.llmKey;
 

@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import type { DragEvent } from 'react';
-import { useStore } from '../store';
+import { useStore, canStartInterview, byokAvailable } from '../store';
 import { parseFile } from '../../lib/parse';
 import { startInterview, pushAudio } from '../../lib/engine';
 import { startAudio, stopAudio } from '../../lib/audio';
-import { hasValidSettings } from '../../lib/settings';
+import { billingConfigured } from '../../lib/billing';
 import type { InterviewType, Seniority } from '@interview-copilot/shared';
 
 type UploadKind = 'jd' | 'resume';
@@ -26,18 +26,28 @@ export function SetupView() {
   const setAudioStatus = useStore((s) => s.setAudioStatus);
 
   const settings = useStore((s) => s.settings);
+  const entitlement = useStore((s) => s.entitlement);
   const openSettings = useStore((s) => s.openSettings);
-  const keysReady = hasValidSettings(settings);
+  const openPaywall = useStore((s) => s.openPaywall);
+  const ready = canStartInterview(settings, entitlement);
+
+  // Why the user can't start yet — drives the inline hint + tap target.
+  const blockReason: 'none' | 'paywall' | 'settings' = !ready
+    ? billingConfigured() && (!entitlement || entitlement.status === 'none')
+      ? 'paywall'
+      : 'settings'
+    : 'none';
 
   const canStart =
-    keysReady &&
+    ready &&
     jd.trim().length > 0 &&
     resume.trim().length > 0 &&
     audioStatus !== 'starting';
 
   async function handleStart() {
-    if (!hasValidSettings(settings)) {
-      openSettings();
+    if (!ready) {
+      if (blockReason === 'paywall') openPaywall();
+      else openSettings();
       return;
     }
 
@@ -58,7 +68,7 @@ export function SetupView() {
     }
 
     setAudioStatus('capturing');
-    startInterview({ jd, resume, seniority, interviewType }, settings);
+    void startInterview({ jd, resume, seniority, interviewType }, settings);
   }
 
   return (
@@ -118,14 +128,28 @@ export function SetupView() {
         </p>
       )}
 
-      {!keysReady && (
+      {blockReason === 'paywall' && (
+        <button
+          type="button"
+          onClick={openPaywall}
+          className="rounded-lg border border-[color-mix(in_srgb,var(--color-adequate)_35%,transparent)] bg-adequate-bg p-2.5 text-left text-xs leading-relaxed text-adequate transition hover:brightness-[0.98]"
+        >
+          Get lifetime access or subscribe to start interviewing. Tap to view plans →
+        </button>
+      )}
+
+      {blockReason === 'settings' && (
         <button
           type="button"
           onClick={openSettings}
           className="rounded-lg border border-[color-mix(in_srgb,var(--color-adequate)_35%,transparent)] bg-adequate-bg p-2.5 text-left text-xs leading-relaxed text-adequate transition hover:brightness-[0.98]"
         >
-          Add your Deepgram and LLM API keys in <strong>Settings</strong> before starting.
-          Tap to configure →
+          {settings.accountMode === 'server'
+            ? byokAvailable(entitlement)
+              ? 'Out of credits. Buy more or switch to your own keys in '
+              : 'Out of credits. Buy more credits in '
+            : 'Add your Deepgram and LLM API keys in '}
+          <strong>Settings</strong> before starting. Tap to configure →
         </button>
       )}
 

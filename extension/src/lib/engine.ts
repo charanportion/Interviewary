@@ -17,7 +17,8 @@ import type {
 } from '@interview-copilot/shared';
 import type { LanguageModel } from 'ai';
 import { useStore } from '../sidepanel/store';
-import { getModel } from './llm';
+import { getModel, type ServerModeContext } from './llm';
+import * as billing from './billing';
 import { openDeepgramLive, type DeepgramLiveSession } from './deepgramLive';
 import {
   generateFollowupQuestions,
@@ -48,8 +49,14 @@ interface EngineState {
   session: Session;
   settings: AppSettings;
   fastModel: LanguageModel;
+  // Set when accountMode === 'server'; used to build the metered report model
+  // and to end/heartbeat the server session.
+  serverCtx: ServerModeContext | null;
   dg: DeepgramLiveSession | null;
   answerWindow: AnswerWindow | null;
+  heartbeat: ReturnType<typeof setInterval> | null;
+  // Flips true when server-mode credits run out — stops agents + transcription.
+  stopped: boolean;
 }
 
 let state: EngineState | null = null;
@@ -58,7 +65,7 @@ function emit(msg: ServerMessage): void {
   useStore.getState().handleServerMessage(msg);
 }
 
-export function startInterview(setup: InterviewSetup, settings: AppSettings): void {
+export async function startInterview(setup: InterviewSetup, settings: AppSettings): Promise<void> {
   const session: Session = {
     id: crypto.randomUUID(),
     startedAt: new Date(),
@@ -72,19 +79,57 @@ export function startInterview(setup: InterviewSetup, settings: AppSettings): vo
     askedQuestionIds: [],
   };
 
-  const fastModel = getModel(settings, 'fast');
-  state = { session, settings, fastModel, dg: null, answerWindow: null };
+  // Server mode: ask our server to start a metered session. It returns a scoped
+  // Deepgram key (we still connect to Deepgram directly) and the model ids the
+  // proxy serves. BYOK mode skips all this and uses the user's own keys.
+  let serverCtx: ServerModeContext | null = null;
+  let deepgramKey = settings.deepgramKey;
+  let heartbeatSessionId: string | null = null;
+
+  if (settings.accountMode === 'server') {
+    try {
+      const s = await billing.startServerSession();
+      serverCtx = {
+        serverUrl: billing.serverUrl(),
+        sessionToken: billing.getSessionToken() ?? '',
+        sessionId: s.sessionId,
+        fastModel: s.serverModel.fast,
+        reportModel: s.serverModel.report,
+      };
+      deepgramKey = s.deepgramKey;
+      heartbeatSessionId = s.sessionId;
+      useStore.getState().setCreditsRemaining(s.creditsRemaining);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      emit({ type: 'ERROR', message: `Couldn't start a credit session: ${message}` });
+      return;
+    }
+  }
+
+  const fastModel = getModel(settings, 'fast', serverCtx ?? undefined);
+  state = {
+    session,
+    settings,
+    fastModel,
+    serverCtx,
+    dg: null,
+    answerWindow: null,
+    heartbeat: null,
+    stopped: false,
+  };
 
   // Only the candidate is transcribed — tab audio in the interviewer's browser
   // is the candidate's voice coming back through Meet.
   state.dg = openDeepgramLive({
-    apiKey: settings.deepgramKey,
+    apiKey: deepgramKey,
     speaker: 'candidate',
     onTurn: handleTurn,
     onError: (err) => emit({ type: 'ERROR', message: `Transcription: ${err.message}` }),
   });
 
   emit({ type: 'SESSION_STARTED', sessionId: session.id });
+
+  if (heartbeatSessionId) startHeartbeat(heartbeatSessionId);
 
   void track({
     event: 'interview_started',
@@ -93,8 +138,9 @@ export function startInterview(setup: InterviewSetup, settings: AppSettings): vo
     properties: {
       seniority: setup.seniority,
       interviewType: setup.interviewType,
-      provider: settings.provider,
-      fastModel: settings.fastModel,
+      mode: settings.accountMode,
+      provider: settings.accountMode === 'server' ? 'server' : settings.provider,
+      fastModel: serverCtx ? serverCtx.fastModel : settings.fastModel,
     },
   });
 
@@ -117,8 +163,44 @@ export function startInterview(setup: InterviewSetup, settings: AppSettings): vo
   });
 }
 
-function handleTurn(turn: TranscriptTurn): void {
+// Server-mode metering: every 60s we report one interview minute. The server
+// ingests it to Polar and decrements the cached balance; `stop` means the
+// balance hit zero, so we tear down server usage and prompt the user.
+function startHeartbeat(sessionId: string): void {
   if (!state) return;
+  state.heartbeat = setInterval(() => {
+    void billing
+      .sessionHeartbeat(sessionId)
+      .then((hb) => {
+        useStore.getState().setCreditsRemaining(hb.creditsRemaining);
+        if (hb.stop) onCreditsExhausted();
+      })
+      .catch(() => {
+        /* transient heartbeat failures are ignored; next tick retries */
+      });
+  }, 60_000);
+}
+
+function clearHeartbeat(): void {
+  if (state?.heartbeat) {
+    clearInterval(state.heartbeat);
+    state.heartbeat = null;
+  }
+}
+
+function onCreditsExhausted(): void {
+  if (!state) return;
+  state.stopped = true;
+  clearHeartbeat();
+  // Stop our metered transcription; agents are gated by `stopped` below. The UI
+  // banner lets the user top up or switch to their own keys, or end the call.
+  state.dg?.close();
+  state.dg = null;
+  emit({ type: 'CREDITS_EXHAUSTED' });
+}
+
+function handleTurn(turn: TranscriptTurn): void {
+  if (!state || state.stopped) return;
   state.session.transcript.push(turn);
   emit({ type: 'TRANSCRIPT_TURN', turn });
   if (turn.speaker === 'candidate') runAgentsForTurn(turn);
@@ -135,7 +217,7 @@ function wordCount(text: string): number {
 }
 
 function runAgentsForTurn(turn: TranscriptTurn): void {
-  if (!state) return;
+  if (!state || state.stopped) return;
 
   const evalPromise = evaluateCurrentAnswer(turn);
   const followupPromise = generateFollowups(turn);
@@ -258,7 +340,8 @@ export function markQuestionAsked(questionId: string): void {
 
 export function endInterview(): void {
   if (!state) return;
-  const { session, settings } = state;
+  const { session, settings, serverCtx } = state;
+  clearHeartbeat();
   state.dg?.close();
   state.dg = null;
 
@@ -273,7 +356,9 @@ export function endInterview(): void {
     },
   });
 
-  const reportModel = getModel(settings, 'report');
+  // In server mode the report runs through the metered proxy, so we generate it
+  // BEFORE ending the server session (which would otherwise reject the call).
+  const reportModel = getModel(settings, 'report', serverCtx ?? undefined);
   generateReport(reportModel, session)
     .then((markdown) => {
       emit({ type: 'REPORT_READY', markdown });
@@ -287,6 +372,7 @@ export function endInterview(): void {
       emit({ type: 'ERROR', message: `Report: ${message}` });
     })
     .finally(() => {
+      if (serverCtx) void billing.endServerSession(serverCtx.sessionId).catch(() => {});
       state = null;
     });
 }

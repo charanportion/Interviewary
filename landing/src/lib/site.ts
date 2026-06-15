@@ -1,7 +1,14 @@
 /** Shared copy + constants for the marketing site. */
 
-/** Served from landing/public — produced by scripts/package-extension.mjs. */
-export const DOWNLOAD_HREF = '/interviewary-extension.zip';
+/**
+ * Edition builds served from landing/public — produced by package-extension.mjs.
+ * Downloads are gated behind purchase: these are linked only from the post-checkout
+ * success page (the right one per the edition the customer bought).
+ */
+export const DOWNLOAD_HREF_LIFETIME = '/interviewary-lifetime.zip';
+export const DOWNLOAD_HREF_SUBSCRIPTION = '/interviewary-subscription.zip';
+/** Back-compat default for the (now dormant) lead-capture download flow. */
+export const DOWNLOAD_HREF = DOWNLOAD_HREF_LIFETIME;
 
 export const PRODUCT_NAME = 'Interviewary';
 export const TAGLINE =

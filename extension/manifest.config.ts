@@ -7,7 +7,7 @@ export default defineManifest({
   description:
     'Live transcription + AI follow-up questions for technical interviews on Google Meet.',
   version: pkg.version,
-  permissions: ['tabCapture', 'activeTab', 'sidePanel', 'storage'],
+  permissions: ['tabCapture', 'activeTab', 'sidePanel', 'storage', 'tabs'],
   icons: {
     16: 'public/icons/icon-16.png',
     32: 'public/icons/icon-32.png',
@@ -29,6 +29,13 @@ export default defineManifest({
     // The route also returns permissive CORS, so this is belt-and-suspenders.
     'https://interviewary.dotportion.com/*',
     'https://*.netlify.app/*',
+    // Billing server (server-mode + Polar entitlements). The server returns
+    // permissive CORS too, but declaring the host avoids any CORS edge cases.
+    // Add your deployed origin here; localhost + common PaaS hosts cover dev/prod.
+    'http://localhost/*',
+    'http://127.0.0.1/*',
+    'https://*.up.railway.app/*',
+    'https://*.onrender.com/*',
   ],
   background: {
     service_worker: 'src/background/index.ts',

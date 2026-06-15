@@ -1,0 +1,14 @@
+# Keep the Docker build context small + secret-free (the server Dockerfile only
+# COPYs the manifests it needs + shared/ + server/ anyway).
+**/node_modules
+**/.git
+**/dist
+**/.next
+**/.turbo
+**/*.zip
+**/.env
+**/.env.*
+!**/.env.example
+extension/dist
+landing/.next
+landing/public/*.zip

@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from 'react';
 import { Reveal } from './Reveal';
-import { DownloadButton } from './DownloadButton';
 import { KEY_CONSOLES } from '../lib/site';
 import { CheckIcon, CopyIcon } from './icons';
 
@@ -53,14 +52,17 @@ type Step = { title: string; time?: string; body: ReactNode };
 
 const STEPS: Step[] = [
   {
-    title: 'Download & unzip',
-    time: '30 s',
+    title: 'Pick a plan & download',
+    time: '1 min',
     body: (
       <>
-        Grab the extension bundle and unzip it anywhere you’ll keep it — Chrome loads the
-        extension from this folder, so don’t delete it afterward.
+        Choose a subscription or lifetime plan. Right after checkout you’ll get a{' '}
+        <strong>download link</strong> (also emailed) for your build — unzip it anywhere you’ll
+        keep it, since Chrome loads the extension from that folder.
         <div className="mt-3">
-          <DownloadButton size="sm" variant="accent" label="Download .zip" />
+          <a href="/pricing" className="btn btn-sm btn-accent">
+            See plans &amp; pricing
+          </a>
         </div>
       </>
     ),
@@ -83,12 +85,14 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: 'Add your keys (one time)',
+    title: 'Activate (add keys on lifetime)',
     time: '2 min',
     body: (
       <>
-        Open <ExtLink href="https://meet.google.com/">Google Meet</ExtLink>, open the side
-        panel, hit the gear → <strong>Settings</strong>, then paste:
+        Open the side panel, hit the gear → <strong>Settings</strong>, and paste your{' '}
+        <strong>license key</strong>. On a <strong>subscription</strong> you’re done — it runs on
+        our keys using your credits. On a <strong>lifetime</strong> plan you can also paste your
+        own keys to run for free:
         <ul className="mt-3 flex flex-col gap-2 text-[14px] text-ink-soft">
           <li className="flex gap-2">
             <span style={{ color: 'var(--color-accent)' }}>•</span>
@@ -141,12 +145,13 @@ export function SetupGuide() {
             Set up in under five minutes.
           </h2>
           <p className="mt-4 text-[15.5px] leading-relaxed text-ink-soft">
-            There’s no account to create, and your keys and interview data stay on your device.
-            Download the extension, load
-            it into Chrome, paste your own API keys once, and you’re interviewing.
+            Pick a plan, install the extension you get after checkout, and activate your license
+            key. Subscriptions run on our keys with credits; lifetime lets you bring your own keys.
           </p>
           <div className="mt-6">
-            <DownloadButton size="lg" />
+            <a href="/pricing" className="btn btn-lg btn-primary">
+              See plans &amp; pricing
+            </a>
           </div>
           <p className="mt-4 text-[12.5px] text-muted">
             Not on the Chrome Web Store yet — this is an early prototype, so it loads as an

@@ -1,10 +1,10 @@
 import { Logo } from './Logo';
-import { DownloadButton } from './DownloadButton';
 
 const SECTION_LINKS = [
   { href: '/#problem', label: 'Problem' },
   { href: '/#how', label: 'How it works' },
   { href: '/#features', label: 'Features' },
+  { href: '/pricing', label: 'Pricing' },
   { href: '/#setup', label: 'Setup' },
 ];
 
@@ -25,10 +25,12 @@ export function Footer({ showCta = true }: { showCta?: boolean }) {
             Give your next technical screen a second set of ears.
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[15.5px] text-ink-soft">
-            Download Interviewary, paste your keys, and run a sharper interview today.
+            Pick a plan, activate your license, and run a sharper interview today.
           </p>
           <div className="mt-7 flex justify-center">
-            <DownloadButton size="lg" />
+            <a href="/pricing" className="btn btn-lg btn-primary">
+              See plans &amp; pricing
+            </a>
           </div>
         </div>
       )}

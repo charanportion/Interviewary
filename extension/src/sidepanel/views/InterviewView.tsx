@@ -14,6 +14,10 @@ export function InterviewView() {
   const reportStatus = useStore((s) => s.reportStatus);
   const setReportStatus = useStore((s) => s.setReportStatus);
   const audioStatus = useStore((s) => s.audioStatus);
+  const serverMode = useStore((s) => s.settings.accountMode === 'server');
+  const creditsRemaining = useStore((s) => s.entitlement?.creditsRemaining ?? 0);
+  const creditsExhausted = useStore((s) => s.creditsExhausted);
+  const openSettings = useStore((s) => s.openSettings);
 
   const questionCount = useStore((s) => s.suggestedQuestions.length);
   const answerCount = useStore((s) => s.transcript.filter((t) => t.speaker === 'candidate').length);
@@ -59,6 +63,16 @@ export function InterviewView() {
         <div className="flex items-center gap-3">
           <RecStatus status={audioStatus} />
           <Elapsed startMs={interviewStartMs} />
+          {serverMode && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${
+                creditsRemaining > 5 ? 'bg-paper-sunk text-muted' : 'bg-weak-bg text-weak'
+              }`}
+              title="Server-mode credits remaining (interview minutes)"
+            >
+              {creditsRemaining} cr
+            </span>
+          )}
         </div>
         <button
           type="button"
@@ -69,6 +83,22 @@ export function InterviewView() {
           End &amp; report
         </button>
       </div>
+
+      {creditsExhausted && (
+        <div className="flex shrink-0 items-start justify-between gap-2 border-b border-line bg-weak-bg px-4 py-2 text-xs leading-snug text-weak">
+          <span className="flex-1">
+            <strong>Out of credits.</strong> Transcription is paused. Buy more credits or switch
+            to your own keys to continue, or end the call to get a report.
+          </span>
+          <button
+            type="button"
+            onClick={openSettings}
+            className="shrink-0 rounded px-1 font-semibold underline hover:no-underline"
+          >
+            Settings
+          </button>
+        </div>
+      )}
 
       {serverErrors.length > 0 && (
         <div className="shrink-0 border-b border-line bg-weak-bg">

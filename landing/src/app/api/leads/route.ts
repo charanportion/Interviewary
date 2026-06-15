@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabaseServer';
+import { allow } from '@/lib/ratelimit';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -7,6 +8,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // CORS needed. Never returns a hard failure that would block the download — the
 // client downloads regardless of the result here.
 export async function POST(request: Request) {
+  if (!allow('leads', request, 5, 60_000)) {
+    return NextResponse.json({ status: 'error', message: 'Too many requests' }, { status: 429 });
+  }
+
   let body: { email?: string; phone?: string; consent?: boolean };
   try {
     body = await request.json();
@@ -14,8 +19,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: 'error', message: 'Invalid JSON' }, { status: 400 });
   }
 
-  const email = (body.email ?? '').trim();
-  const phone = (body.phone ?? '').trim();
+  const email = (body.email ?? '').trim().slice(0, 254);
+  const phone = (body.phone ?? '').trim().slice(0, 32);
   const consent = body.consent === true;
 
   if (!EMAIL_RE.test(email)) {

@@ -5,15 +5,19 @@ import { SetupView } from './views/SetupView';
 import { InterviewView } from './views/InterviewView';
 import { SettingsView } from './views/SettingsView';
 import { ReportView } from './views/ReportView';
+import { PaywallView } from './views/PaywallView';
 
 export function App() {
   const phase = useStore((s) => s.phase);
   const applyLoadedSettings = useStore((s) => s.applyLoadedSettings);
+  const refreshEntitlement = useStore((s) => s.refreshEntitlement);
   const openSettings = useStore((s) => s.openSettings);
 
   useEffect(() => {
-    loadSettings().then(applyLoadedSettings);
-  }, [applyLoadedSettings]);
+    loadSettings()
+      .then(applyLoadedSettings)
+      .then(() => refreshEntitlement());
+  }, [applyLoadedSettings, refreshEntitlement]);
 
   return (
     <div className="flex h-full flex-col bg-paper text-ink">
@@ -21,6 +25,8 @@ export function App() {
       <main className="flex-1 overflow-hidden">
         {phase === 'settings' ? (
           <SettingsView />
+        ) : phase === 'paywall' ? (
+          <PaywallView />
         ) : phase === 'report' ? (
           <ReportView />
         ) : phase === 'interview' ? (

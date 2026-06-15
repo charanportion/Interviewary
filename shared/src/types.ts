@@ -1,6 +1,8 @@
 // Single source of truth for the protocol shared by extension and backend.
 // Mirrors docs/ARCHITECTURE.md → "Session state shape" and "WebSocket message protocol".
 
+import type { AccountMode } from './billing.js';
+
 export type Seniority = 'junior' | 'mid' | 'senior';
 export type InterviewType = 'screening' | 'deep_dive';
 export type Speaker = 'interviewer' | 'candidate';
@@ -12,6 +14,13 @@ export type Rating = 'weak' | 'adequate' | 'strong' | 'exceptional';
 export type LlmProvider = 'anthropic' | 'openai' | 'google' | 'xai';
 
 export interface AppSettings {
+  // Which runtime to use for the next interview. 'byok' uses the keys below
+  // (free, no credits); 'server' uses our billing server + credits. See billing.ts.
+  accountMode: AccountMode;
+  // Polar license key (identity token). Resolves to an entitlement + credits.
+  licenseKey: string;
+
+  // ── BYOK credentials (only required when accountMode === 'byok') ──
   deepgramKey: string;
   provider: LlmProvider;
   llmKey: string;
@@ -87,5 +96,8 @@ export type ServerMessage =
   // of on every un-evaluated turn. null clears it.
   | { type: 'EVAL_PENDING'; turnId: string | null }
   | { type: 'REPORT_READY'; markdown: string }
+  // Server-mode credits hit zero mid-interview. The UI prompts to top up or
+  // switch to BYO keys; transcription/agents on our server stop.
+  | { type: 'CREDITS_EXHAUSTED' }
   | { type: 'ERROR'; message: string }
   | { type: 'PONG' };

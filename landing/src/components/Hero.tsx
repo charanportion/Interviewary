@@ -1,5 +1,4 @@
 import { PanelMock } from './PanelMock';
-import { DownloadButton } from './DownloadButton';
 import { ArrowRightIcon } from './icons';
 
 export function Hero() {
@@ -28,7 +27,9 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <DownloadButton size="lg" />
+            <a href="/pricing" className="btn btn-lg btn-primary">
+              See plans &amp; pricing
+            </a>
             <a href="#how" className="btn btn-lg btn-secondary">
               See how it works
               <ArrowRightIcon className="h-4 w-4" />
@@ -36,7 +37,7 @@ export function Hero() {
           </div>
 
           <p className="mt-5 text-[13px] text-muted">
-            Free · local-first · bring your own keys · ~$0.09 per interview
+            Subscriptions from ₹699/mo · or lifetime + bring your own keys
           </p>
         </div>
 

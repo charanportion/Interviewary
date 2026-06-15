@@ -5,6 +5,7 @@
 
 import type { AppSettings, LlmProvider } from '@interview-copilot/shared';
 import { PROVIDERS } from './providers';
+import { billingConfigured } from './billing';
 
 const STORAGE_KEY = 'settings';
 
@@ -13,6 +14,10 @@ const DEFAULT_PROVIDER: LlmProvider = 'anthropic';
 export function emptySettings(): AppSettings {
   const p = PROVIDERS[DEFAULT_PROVIDER];
   return {
+    // Default to credits in paid builds (works on first run for both editions);
+    // pure-BYOK (no billing server) builds default to the user's own keys.
+    accountMode: billingConfigured() ? 'server' : 'byok',
+    licenseKey: '',
     deepgramKey: '',
     provider: DEFAULT_PROVIDER,
     llmKey: '',

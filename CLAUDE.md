@@ -7,7 +7,24 @@
 
 A Chrome extension that runs in the side panel during a Google Meet interview. It transcribes the candidate's answers in real time and helps a **non-technical recruiter** conduct **technical interviews** by suggesting questions and evaluating answer quality. At the end of the interview, it generates a downloadable markdown report.
 
-**Fully serverless / BYO-key.** There is no backend we host. The user installs the unpacked extension, enters their own Deepgram key and an LLM provider + API key + models in a Settings screen, and everything runs client-side in the side panel. Deepgram and the LLM provider are called directly from the browser (CORS is bypassed via manifest `host_permissions`).
+**Two runtimes (BYOK + paid credits).** As of the payments work, the extension supports:
+
+- **BYOK (lifetime):** the user enters their own Deepgram key + LLM provider/key/models in
+  Settings; everything runs client-side in the side panel (the original serverless design).
+  Deepgram and the LLM provider are called directly from the browser (CORS bypassed via
+  `host_permissions`).
+- **Server mode (credits):** the extension calls our **billing server** (`server/`), which
+  proxies the LLM with our keys and hands the extension our Deepgram key so it
+  still connects to Deepgram **directly** (the 2s latency budget is preserved — audio is never
+  tunneled through us). Usage is metered where **1 credit = 1 interview minute**.
+
+**Payments via Polar (Merchant of Record).** Access is hard-paywalled: a user buys **Lifetime**
+(one-time, BYOK + N free credits) or a **Subscription** (recurring, credit allotment) before
+running interviews; top-ups add credits. Identity is a Polar **license key** pasted in Settings.
+Polar is the source of truth for entitlements/grants; the server caches them in Supabase Postgres and
+**enforces** the credit balance (Polar ingests usage but never blocks on balance). See
+`server/README.md`. Payments are **off** when `VITE_BILLING_SERVER_URL` is unset — that build is
+pure-BYOK with no paywall, exactly as before.
 
 This is a **2-week prototype** to demo to a founder. It is not a production product. Optimize for:
 - Time-to-demo over engineering polish
@@ -29,13 +46,14 @@ Read these in order when starting fresh on a task:
 ## Tech stack at a glance
 
 - **Extension:** Chrome MV3, React 19, Tailwind 4, TypeScript, Vite + `@crxjs/vite-plugin`
-- **Backend:** None. All logic runs in the side panel (see `extension/src/lib/engine.ts`).
+- **Backend:** None for BYOK (all logic runs in the side panel — see `extension/src/lib/engine.ts`). A small **billing server** (`server/`: Hono on Node + Supabase Postgres + Polar SDK) powers paid server mode + entitlements only.
 - **Transcription:** Deepgram Nova-3 streaming over a native browser WebSocket (`wss://api.deepgram.com/v1/listen`, `['token', key]` subprotocol auth)
 - **LLM:** BYO-key, multi-provider — Anthropic, OpenAI, Google (Gemini), xAI (Grok). User picks a fast model (live agents) and a report model.
 - **Agent layer:** Vercel AI SDK (`ai` + `@ai-sdk/{anthropic,openai,google,xai}`) — used as a provider-agnostic streaming wrapper, not an agent framework. `extension/src/lib/llm.ts` builds the model from settings.
-- **Storage:** No DB. Session state in memory in the side panel. Settings (keys/models) in `chrome.storage.local`. Reports downloaded as `.md` files.
-- **Auth:** None.
-- **Deploy:** None. Users load the unpacked extension and configure their own keys.
+- **Storage:** No DB in the extension. Session state in memory in the side panel. Settings (keys/models/license key/mode) in `chrome.storage.local`. Reports downloaded as `.md` files. The billing server uses **Supabase Postgres** to cache entitlements + a usage ledger.
+- **Auth:** None in the extension UI. The billing server identifies users by a Polar **license key** → short-lived session token (`jose` JWT).
+- **Payments:** **Polar** (Merchant of Record): one-time (lifetime), subscription, top-ups; usage meter for credits; license-key benefit; webhooks.
+- **Deploy:** Extension is loaded unpacked. The billing server deploys to Railway/Render (see `server/README.md`).
 
 ## Critical conventions
 
@@ -52,22 +70,26 @@ Read these in order when starting fresh on a task:
 
 These have been explicitly cut for scope. Do not add them, even partially, even "just the scaffolding":
 
-- Database / persistence (Postgres, SQLite, anything)
-- User auth / accounts / Clerk
-- Billing / pricing / Stripe
 - ATS integrations (Greenhouse, Lever, etc.)
 - Multi-tenancy or organizations
 - Skill coverage tracker (UI or backend)
 - Red flag detector agent
 - Custom rubrics / skill libraries
 - Recall.ai or any meeting bot infrastructure
-- Web dashboard (the in-panel Settings screen for BYO keys/models is in scope; a separate web/settings dashboard is not)
-- A hosted backend / proxy server (the whole point is serverless, BYO-key)
+- Web dashboard (the in-panel Settings screen is in scope; a separate web/settings dashboard is not)
 - Chrome Web Store publishing
 - Observability tooling (Langfuse, Sentry, PostHog)
 - Tests beyond a smoke test for the agent calls
 
-If a feature isn't in `docs/PRD.md` under "In scope," it is out of scope. Ask before adding it.
+**Scoped carve-out (approved, payments work):** database, auth, billing, and a hosted
+backend were originally on this list. They are now **allowed but ONLY inside `server/`** and
+ONLY in service of Polar payments + credit-metered server mode. Do **not** spread them into the
+extension (the side panel stays DB-less and auth-UI-less), do **not** add a payment provider
+other than Polar, and do **not** build a credit/entitlement feature the server doesn't already
+support without asking. The BYOK side-panel path must keep working with `VITE_BILLING_SERVER_URL`
+unset.
+
+If a feature isn't in `docs/PRD.md` under "In scope" (or the payments scope above), it is out of scope. Ask before adding it.
 
 ## Repo layout (expected)
 
@@ -88,14 +110,27 @@ interview-copilot/
 │   │       ├── audio.ts      ← chrome.tabCapture → MediaRecorder chunks
 │   │       ├── deepgramLive.ts ← browser WebSocket to Deepgram
 │   │       ├── engine.ts     ← interview orchestration (was the backend)
-│   │       ├── llm.ts        ← provider-agnostic model factory
+│   │       ├── llm.ts        ← provider-agnostic model factory (+ server-mode proxy branch)
+│   │       ├── billing.ts    ← client for the billing server (resolve/me/session/checkout)
 │   │       ├── providers.ts  ← provider/model catalog
 │   │       ├── settings.ts   ← chrome.storage.local persistence
 │   │       ├── validateKeys.ts ← "Test keys" checks
 │   │       └── agents/       ← questionGenerator, answerEvaluator, report, schemas
 │   └── package.json
-├── shared/                   ← shared TS types (consumed by the extension)
-│   └── src/types.ts
+├── shared/                   ← shared TS types (consumed by extension + server)
+│   └── src/
+│       ├── types.ts          ← session/agent/protocol types
+│       └── billing.ts        ← payments & credits protocol (entitlement, DTOs)
+├── server/                   ← billing server (Hono + Supabase + Polar) — paid mode only
+│   ├── README.md             ← Polar/Supabase/Deepgram setup steps
+│   ├── schema.sql            ← Supabase Postgres schema
+│   └── src/
+│       ├── index.ts          ← Hono app: auth/resolve, me, session/*, llm proxy, checkout, webhooks
+│       ├── polar.ts          ← Polar SDK: validate license, customer state, ingest usage, checkout
+│       ├── deepgram.ts       ← server-mode Deepgram key (handed to the extension)
+│       ├── auth.ts           ← session-token (jose JWT) issue/verify
+│       ├── db.ts             ← Supabase data-access layer
+│       └── env.ts            ← typed env config
 └── docs/
     ├── PRD.md
     ├── ARCHITECTURE.md
@@ -120,31 +155,41 @@ pnpm install
 # Run extension build in watch mode
 pnpm --filter extension dev
 
+# Run the billing server (paid mode) — copy server/.env.example → server/.env first
+pnpm --filter @interview-copilot/server dev
+pnpm --filter @interview-copilot/server db:init   # apply Supabase schema once
+
 # Load extension into Chrome:
 # 1. chrome://extensions
 # 2. Enable Developer mode
 # 3. Click "Load unpacked"
 # 4. Select extension/dist
 # 5. Open the side panel → Settings → enter Deepgram + LLM keys → Test keys → Save
+#    (or, in a payments build, Activate a Polar license key and pick a mode)
 ```
 
 ## Environment variables / keys
 
-There are **no build-time or server env vars**. All credentials are entered by the
-user at runtime in the in-panel Settings screen and stored in `chrome.storage.local`:
-
+**Extension (BYOK):** credentials are entered at runtime in Settings and stored in
+`chrome.storage.local` — never synced:
 - Deepgram API key (free $200 credit on signup)
 - An LLM provider (Anthropic / OpenAI / Google / xAI) + that provider's API key
 - A fast model (live agents) and a report model
 
-Keys never leave the user's machine and are not synced.
+**Extension build-time (Vite):** one optional var, `VITE_BILLING_SERVER_URL` (see
+`extension/.env.example`). Unset ⇒ pure-BYOK build, no paywall. Set ⇒ enables payments + server mode.
+
+**Billing server:** secrets live in `server/.env` (never in the extension) — Supabase `DATABASE_URL`,
+Polar access token / org id / webhook secret / product ids / meter id, a `JWT_SECRET`, the
+Deepgram admin key + project id, and the server-mode LLM key. See `server/.env.example` and
+`server/README.md`.
 
 ## How to ask for help
 
 If a requirement is ambiguous, STOP and ask before writing code. The cost of asking is one message; the cost of building the wrong thing is a wasted day.
 
 Common ambiguities to watch for:
-- "Should this be in the extension or a backend?" — there is no backend; it all runs in the side panel
-- "Should this persist?" — no, never, except BYO-key settings (see conventions)
+- "Should this be in the extension or a backend?" — interview logic runs in the side panel. Only Polar payments + credit-metered server mode live in `server/`. Don't move interview logic server-side.
+- "Should this persist?" — extension: no, except settings. Server: only entitlement cache + usage ledger in Supabase (see `server/`).
 - "Should I add error handling for X?" — only if X has happened in testing; do not preemptively handle every error
 - "Should I support Zoom / Teams?" — no, Google Meet only

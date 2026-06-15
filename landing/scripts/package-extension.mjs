@@ -1,10 +1,13 @@
-// Zips the built extension (extension/dist) into the landing site's public
-// folder so the Download button serves a real, current build. Cross-platform
-// (runs locally on Windows and on Netlify's Linux builders).
+// Builds the extension once per edition and zips each into the landing site's
+// public folder, so the post-checkout success page can serve the right build:
+//   - lifetime     → interviewary-lifetime.zip      (BYOK + credits)
+//   - subscription → interviewary-subscription.zip  (credits only, no BYOK)
 //
-// Run via the repo-root script:  pnpm package:extension
-// (which builds the extension first, then invokes this).
+// The edition is passed to Vite via VITE_EDITION (read by extension/src/lib/edition.ts).
+// Cross-platform (Windows local + Linux CI). Run via the repo-root script:
+//   pnpm package:extension
 
+import { execSync } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,37 +17,44 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..');
 const distDir = resolve(repoRoot, 'extension', 'dist');
 const outDir = resolve(repoRoot, 'landing', 'public');
-const outFile = resolve(outDir, 'interviewary-extension.zip');
 
-if (!existsSync(distDir) || !statSync(distDir).isDirectory()) {
-  console.error(
-    `\n✗ Extension build not found at ${distDir}\n` +
-      `  Build the extension first:  pnpm --filter @interview-copilot/extension build\n` +
-      `  (or just run:  pnpm package:extension)\n`,
-  );
-  process.exit(1);
-}
+const EDITIONS = ['lifetime', 'subscription'];
 
 mkdirSync(outDir, { recursive: true });
 
-const output = createWriteStream(outFile);
-const archive = archiver('zip', { zlib: { level: 9 } });
+function zipDist(outFile, folderName) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const output = createWriteStream(outFile);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    output.on('close', () => resolvePromise(archive.pointer()));
+    archive.on('warning', (err) => {
+      if (err.code === 'ENOENT') console.warn(err);
+      else rejectPromise(err);
+    });
+    archive.on('error', rejectPromise);
+    archive.pipe(output);
+    // Single, clearly-named folder inside the zip for "Load unpacked".
+    archive.directory(distDir, folderName);
+    archive.finalize();
+  });
+}
 
-output.on('close', () => {
-  const kb = (archive.pointer() / 1024).toFixed(0);
-  console.log(`✓ Packaged extension → landing/public/interviewary-extension.zip (${kb} KB)`);
-});
+for (const edition of EDITIONS) {
+  console.log(`\n▸ Building extension (${edition})…`);
+  execSync('pnpm --filter @interview-copilot/extension build', {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: { ...process.env, VITE_EDITION: edition },
+  });
 
-archive.on('warning', (err) => {
-  if (err.code === 'ENOENT') console.warn(err);
-  else throw err;
-});
-archive.on('error', (err) => {
-  throw err;
-});
+  if (!existsSync(distDir) || !statSync(distDir).isDirectory()) {
+    console.error(`\n✗ Extension build produced no dist at ${distDir}`);
+    process.exit(1);
+  }
 
-archive.pipe(output);
-// Place the build under a named folder inside the zip so it extracts to a
-// single, clearly-named directory the user points "Load unpacked" at.
-archive.directory(distDir, 'interviewary-extension');
-await archive.finalize();
+  const outFile = resolve(outDir, `interviewary-${edition}.zip`);
+  const bytes = await zipDist(outFile, `interviewary-${edition}`);
+  console.log(`✓ Packaged ${edition} → landing/public/interviewary-${edition}.zip (${(bytes / 1024).toFixed(0)} KB)`);
+}
+
+console.log('\n✓ Both editions packaged.');

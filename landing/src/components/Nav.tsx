@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { Logo } from './Logo';
-import { DownloadButton } from './DownloadButton';
 
 const LINKS = [
   { href: '#problem', label: 'Problem' },
   { href: '#how', label: 'How it works' },
   { href: '#features', label: 'Features' },
+  { href: '/pricing', label: 'Pricing' },
   { href: '#setup', label: 'Setup' },
 ];
 
@@ -47,7 +47,9 @@ export function Nav() {
           ))}
         </div>
 
-        <DownloadButton size="sm" label="Download" className="shrink-0" />
+        <a href="/pricing" className="btn btn-sm btn-primary shrink-0">
+          Get access
+        </a>
       </nav>
     </header>
   );

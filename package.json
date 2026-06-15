@@ -7,7 +7,7 @@
     "dev": "pnpm --filter @interview-copilot/extension dev",
     "dev:extension": "pnpm --filter @interview-copilot/extension dev",
     "dev:landing": "pnpm --filter @interview-copilot/landing dev",
-    "package:extension": "pnpm --filter @interview-copilot/extension build && node landing/scripts/package-extension.mjs",
+    "package:extension": "node landing/scripts/package-extension.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck"
   },
