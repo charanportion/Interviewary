@@ -42,6 +42,23 @@
   --shadow-soft: 0 1px 2px rgb(27 24 20 / 0.04), 0 4px 12px rgb(27 24 20 / 0.05);
   --shadow-pop: 0 2px 4px rgb(27 24 20 / 0.06), 0 10px 28px rgb(27 24 20 / 0.10);
   --shadow-lift: 0 4px 8px rgb(27 24 20 / 0.05), 0 24px 60px rgb(27 24 20 / 0.12);
+
+  /* shadcn / Magic UI token aliases → mapped onto the warm palette so the
+     library components render on-brand without editing each one. */
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --color-card: var(--color-surface);
+  --color-border: var(--color-line);
+  --color-muted-foreground: var(--color-muted);
+
+  /* Magic UI animation tokens (Tailwind v4 — keyframes defined below). */
+  --animate-marquee: marquee var(--duration, 40s) linear infinite;
+  --animate-marquee-vertical: marquee-vertical var(--duration, 40s) linear infinite;
+  --animate-shiny-text: shiny-text 8s infinite;
+  --animate-aurora: aurora 12s ease-in-out infinite alternate;
+  --animate-shimmer-slide: shimmer-slide var(--speed, 3s) ease-in-out infinite alternate;
+  --animate-spin-around: spin-around calc(var(--speed, 3s) * 2) infinite linear;
+  --animate-meteor: meteor 5s linear infinite;
 }
 
 :root {
@@ -294,29 +311,222 @@ body {
   animation: ia-flash 1.4s ease-out;
 }
 
-/* Scroll reveal — toggled by the useReveal IntersectionObserver hook. */
-.reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  transition:
-    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-    transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: opacity, transform;
+/* ----------------------------------------------------------------------------
+   Hero "bright" layer — the one showstopper zone. Everything below the hero
+   stays on the calm warm-paper ground; these helpers are scoped to the hero.
+   -------------------------------------------------------------------------- */
+
+/* Animated aurora / gradient mesh that lives behind the hero. */
+.hero-aurora {
+  background:
+    radial-gradient(40rem 26rem at 18% 12%, color-mix(in srgb, var(--color-accent) 22%, transparent) 0%, transparent 60%),
+    radial-gradient(34rem 24rem at 84% 8%, #cfe0f2 0%, transparent 58%),
+    radial-gradient(38rem 30rem at 70% 88%, #f4e7cf 0%, transparent 60%),
+    radial-gradient(30rem 22rem at 10% 92%, color-mix(in srgb, var(--color-exceptional) 16%, transparent) 0%, transparent 60%);
+  background-size: 200% 200%;
+  animation: ia-aurora 22s ease-in-out infinite;
+  filter: saturate(1.05);
 }
-.reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+
+@keyframes ia-aurora {
+  0%,
+  100% {
+    background-position: 0% 0%, 100% 0%, 100% 100%, 0% 100%;
+  }
+  50% {
+    background-position: 30% 20%, 70% 30%, 60% 70%, 30% 80%;
+  }
+}
+
+/* A soft pulsing glow blob, used behind the product mock. */
+.glow-blob {
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-accent) 38%, transparent) 0%, transparent 70%);
+  filter: blur(28px);
+  animation: ia-glow 6s ease-in-out infinite;
+}
+@keyframes ia-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+/* Animated gradient clip-text for the headline accent word. */
+.text-gradient-accent {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-accent) 0%,
+    #3f7fbf 30%,
+    var(--color-exceptional) 55%,
+    var(--color-accent) 90%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ia-text-pan 7s ease-in-out infinite;
+}
+@keyframes ia-text-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Gentle float used by hero decorations / chips. */
+@keyframes ia-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float {
+  animation: ia-float 5s ease-in-out infinite;
+}
+
+/* Shimmer sweep for the "Analyzing…" state in the live demo. */
+@keyframes ia-shimmer {
+  0% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 250% 0;
+  }
+}
+.animate-shimmer {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--color-accent) 18%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: ia-shimmer 1.3s ease-in-out infinite;
+}
+
+/* Blinking caret for the typewriter transcript. */
+@keyframes ia-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.animate-caret {
+  animation: ia-caret 1s step-end infinite;
+}
+
+/* Magic UI keyframes (referenced by the --animate-* tokens above). */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+  }
+}
+@keyframes shiny-text {
+  0%,
+  90%,
+  100% {
+    background-position: calc(-100% - var(--shiny-width)) 0;
+  }
+  30%,
+  60% {
+    background-position: calc(100% + var(--shiny-width)) 0;
+  }
+}
+@keyframes aurora {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+@keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+  }
+}
+@keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+  }
+  15%,
+  35% {
+    transform: translateZ(0) rotate(90deg);
+  }
+  65%,
+  85% {
+    transform: translateZ(0) rotate(270deg);
+  }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+  }
+}
+@keyframes meteor {
+  0% {
+    transform: rotate(var(--angle)) translateX(0);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--angle)) translateX(-500px);
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-rec,
-  .animate-flash {
-    animation: none;
+  .animate-flash,
+  .hero-aurora,
+  .glow-blob,
+  .text-gradient-accent,
+  .animate-float,
+  .animate-shimmer,
+  .animate-caret,
+  .animate-marquee,
+  .animate-marquee-vertical,
+  .animate-shiny-text,
+  .animate-aurora,
+  .animate-shimmer-slide,
+  .animate-spin-around,
+  .animate-meteor {
+    animation: none !important;
   }
-  .reveal {
-    opacity: 1;
-    transform: none;
-    transition: none;
+  .text-gradient-accent {
+    /* Fall back to a solid accent so the word stays readable. */
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    background-image: none;
+    color: var(--color-accent);
   }
 }

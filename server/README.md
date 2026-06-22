@@ -87,12 +87,17 @@ pnpm --filter @interview-copilot/server db:init
 
    | Plan | Type | Price | Credits |
    |---|---|---|---|
-   | Subscription Starter | monthly | ₹699 | 250/mo |
-   | Subscription Pro | monthly | ₹1,999 | 800/mo |
-   | Subscription Team | monthly | ₹4,999 | 2,500/mo |
-   | Lifetime Starter | one-time | ₹2,499 | 200 + BYOK |
-   | Lifetime Pro | one-time | ₹6,999 | 1,000 + BYOK |
-   | Top-up Small / Medium / Large | one-time | ₹399 / ₹1,799 / ₹5,999 | 100 / 500 / 2,000 |
+   | Subscription Starter | monthly | ₹699 / $7 | 250/mo |
+   | Subscription Pro | monthly | ₹1,999 / $21 | 800/mo |
+   | Subscription Team | monthly | ₹4,999 / $53 | 2,500/mo |
+   | Lifetime Starter | one-time | ₹2,499 / $26 | 200 + BYOK |
+   | Lifetime Pro | one-time | ₹6,999 / $74 | 1,000 + BYOK |
+   | Top-up Small / Medium / Large | one-time | ₹399·₹1,799·₹5,999 / $4·$19·$63 | 100 / 500 / 2,000 |
+
+   Each product is priced in **both INR and USD** (see `src/scripts/prices.ts`). Polar shows
+   each buyer their local currency at checkout from their IP — India → ₹, and (when the org's
+   default presentment currency is USD) everywhere else → $. Change prices in `prices.ts`, then
+   `pnpm --filter @interview-copilot/server polar:reprice`.
 
    (The extension's display catalog mirrors these in `extension/src/lib/plans.ts` — keep in sync.)
 4. **Webhook** → `https://<your-server>/webhooks/polar`, secret → `POLAR_WEBHOOK_SECRET`.

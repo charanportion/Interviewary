@@ -6,7 +6,9 @@ build/
 .DS_Store
 .env
 .env.local
+.env.prod
 *.tsbuildinfo
+.playwright-mcp/
 
 # Next.js (landing)
 landing/.next/

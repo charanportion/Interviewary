@@ -109,7 +109,7 @@ export async function ingestMinutes(customerId: string, sessionId: string, minut
 
 export async function createCheckout(
   product: ProductKind,
-  opts: { email?: string; customerId?: string } = {},
+  opts: { email?: string; customerId?: string; customerIp?: string } = {},
 ): Promise<string> {
   const productId = env.polar.products[product];
   if (!productId) throw new Error(`No Polar product id configured for "${product}"`);
@@ -127,10 +127,13 @@ export async function createCheckout(
 
   // Bind to the existing customer when we know them (top-ups from an activated
   // user) so credits always land on the right account, regardless of typed email.
+  // customerIpAddress lets Polar pick the buyer's local currency (INR/USD) for our
+  // multi-currency products; without it a backend-created session can't geo-detect.
   const checkout: any = await polar.checkouts.create({
     products: [productId],
     successUrl: success.toString(),
     returnUrl,
+    ...(opts.customerIp ? { customerIpAddress: opts.customerIp } : {}),
     ...(opts.customerId ? { customerId: opts.customerId } : opts.email ? { customerEmail: opts.email } : {}),
   } as any);
   const url: string | undefined = checkout?.url;

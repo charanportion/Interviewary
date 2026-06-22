@@ -22,10 +22,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL('/pricing', req.url));
   }
 
+  // Forward the visitor's IP so the billing server can hand it to Polar, which uses
+  // it to pick the buyer's local currency (INR in India, USD elsewhere). Without
+  // this the billing server would only see our server's IP.
+  const visitorIp =
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    '';
+
   try {
     const res = await fetch(`${BILLING_SERVER_URL}/v1/checkout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(visitorIp ? { 'x-customer-ip': visitorIp } : {}),
+      },
       body: JSON.stringify({ product: plan }),
     });
     if (!res.ok) throw new Error(`billing checkout ${res.status}`);

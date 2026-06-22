@@ -13,6 +13,7 @@ import { Polar } from '@polar-sh/sdk';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { PLAN, fixedPrices, type PlanSpec } from './prices.ts';
 
 const accessToken = process.env.POLAR_ACCESS_TOKEN;
 const organizationId = process.env.POLAR_ORGANIZATION_ID;
@@ -30,20 +31,8 @@ if (process.env.POLAR_PRODUCT_SUB_PRO) {
 
 const polar = new Polar({ accessToken, server });
 
-// ── Credit grants (interview minutes) + prices ──
-// price is in the org's minor units (INR → paise, i.e. ₹ × 100; ₹60 is the min).
-// Subscriptions grant credits per cycle (rollover off); lifetime/top-ups roll over.
-const PLAN = {
-  sub_starter: { name: 'Interviewary Starter (Monthly)', price: 69900, credits: 250, rollover: false, interval: 'month' as const },
-  sub_pro: { name: 'Interviewary Pro (Monthly)', price: 199900, credits: 800, rollover: false, interval: 'month' as const },
-  sub_team: { name: 'Interviewary Team (Monthly)', price: 499900, credits: 2500, rollover: false, interval: 'month' as const },
-  life_starter: { name: 'Interviewary Lifetime Starter', price: 249900, credits: 200, rollover: true, interval: null as null | 'month' },
-  life_pro: { name: 'Interviewary Lifetime Pro', price: 699900, credits: 1000, rollover: true, interval: null },
-  topup_small: { name: 'Top-up — 100 credits', price: 39900, credits: 100, rollover: true, interval: null },
-  topup_medium: { name: 'Top-up — 500 credits', price: 179900, credits: 500, rollover: true, interval: null },
-  topup_large: { name: 'Top-up — 2000 credits', price: 599900, credits: 2000, rollover: true, interval: null },
-} as const;
-
+// Credit grants (interview minutes) + prices live in ./prices.ts (shared with the
+// reprice script). Each product is priced in both INR and USD (see ./prices.ts).
 type Key = keyof typeof PLAN;
 
 async function createMeterCredit(_label: string, units: number, rollover: boolean): Promise<string> {
@@ -55,35 +44,16 @@ async function createMeterCredit(_label: string, units: number, rollover: boolea
   return b.id as string;
 }
 
-// The org has a default presentment currency that prices must use; it isn't
-// exposed on the org object, so we discover it by trying USD then alternatives
-// and cache the first that works.
-const CURRENCY_CANDIDATES = ['usd', 'inr', 'eur', 'gbp', 'sgd', 'aud', 'cad'];
-let workingCurrency: string | null = null;
-
-async function createProduct(name: string, priceAmount: number, interval: null | 'month'): Promise<string> {
-  const tryOrder = workingCurrency ? [workingCurrency] : CURRENCY_CANDIDATES;
-  let lastErr: unknown;
-  for (const priceCurrency of tryOrder) {
-    try {
-      const p: any = await polar.products.create({
-        name,
-        recurringInterval: interval,
-        prices: [{ amountType: 'fixed', priceAmount, priceCurrency }],
-      } as any);
-      if (!workingCurrency) {
-        workingCurrency = priceCurrency;
-        console.log(`  (using currency: ${priceCurrency})`);
-      }
-      return p.id as string;
-    } catch (err: any) {
-      const detail = JSON.stringify(err?.body ?? err?.message ?? '');
-      // Only keep trying for the presentment-currency error; rethrow anything else.
-      if (!/presentment currency/i.test(detail)) throw err;
-      lastErr = err;
-    }
-  }
-  throw lastErr;
+// Create a product priced in both INR and USD. Polar requires the org's default
+// presentment currency to be among the prices — both are sent, so it's satisfied
+// whether the org default is INR or USD.
+async function createProduct(name: string, plan: PlanSpec): Promise<string> {
+  const p: any = await polar.products.create({
+    name,
+    recurringInterval: plan.interval,
+    prices: fixedPrices(plan),
+  } as any);
+  return p.id as string;
 }
 
 async function attach(productId: string, benefitIds: string[]): Promise<void> {
@@ -106,9 +76,9 @@ async function main() {
   const productIds = {} as Record<Key, string>;
   for (const key of Object.keys(PLAN) as Key[]) {
     const plan = PLAN[key];
-    console.log(`Creating ${key} (${plan.name}, ${(plan.price / 100).toFixed(2)}, ${plan.credits} credits)…`);
+    console.log(`Creating ${key} (${plan.name}, ₹${(plan.inr / 100).toLocaleString('en-IN')} / $${(plan.usd / 100).toFixed(2)}, ${plan.credits} credits)…`);
     const creditId = await createMeterCredit(plan.name, plan.credits, plan.rollover);
-    const productId = await createProduct(plan.name, plan.price, plan.interval);
+    const productId = await createProduct(plan.name, plan);
     // Subscriptions + lifetime also grant a license key (the auth token); top-ups
     // only add credits.
     const grantsLicense = key.startsWith('sub_') || key.startsWith('life_');

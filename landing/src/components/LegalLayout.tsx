@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Footer } from './Footer';
 import { MinimalHeader } from './MinimalHeader';
+import { Reveal } from './Reveal';
 import { LEGAL_LAST_UPDATED } from '../lib/site';
 
 const RELATED = [
@@ -24,12 +25,14 @@ export function LegalLayout({ title, intro, current, children }: Props) {
       <MinimalHeader />
 
       <main className="section max-w-3xl py-16 sm:py-20">
-        <div className="label-eyebrow mb-3">Legal</div>
-        <h1 className="display text-[34px] font-semibold leading-tight text-ink sm:text-[42px]">
-          {title}
-        </h1>
-        <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">{intro}</p>
-        <p className="mt-3 text-[13px] text-muted">Last updated: {LEGAL_LAST_UPDATED}</p>
+        <Reveal>
+          <div className="label-eyebrow mb-3">Legal</div>
+          <h1 className="display text-[34px] font-semibold leading-tight text-ink sm:text-[42px]">
+            {title}
+          </h1>
+          <p className="mt-4 text-[16px] leading-relaxed text-ink-soft">{intro}</p>
+          <p className="mt-3 text-[13px] text-muted">Last updated: {LEGAL_LAST_UPDATED}</p>
+        </Reveal>
 
         <div
           className="my-8 rounded-xl border p-4 text-[13.5px] leading-relaxed text-ink-soft"
