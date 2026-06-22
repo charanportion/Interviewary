@@ -145,8 +145,8 @@ export function SetupGuide() {
             Set up in under five minutes.
           </h2>
           <p className="mt-4 text-[15.5px] leading-relaxed text-ink-soft">
-            Pick a plan, install the extension you get after checkout, and activate your license
-            key. Subscriptions run on our keys with credits; lifetime lets you bring your own keys.
+            Pick a plan, install the extension you get after you buy, and paste in your license
+            key. Subscriptions run on our keys; the lifetime plan lets you use your own for free.
           </p>
           <div className="mt-6">
             <a href="/pricing" className="btn btn-lg btn-primary">

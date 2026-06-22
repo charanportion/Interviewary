@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { DownloadProvider } from '@/components/DownloadProvider';
 import { JsonLd } from '@/components/JsonLd';
+import { ScrollProgress } from '@/components/ui/scroll-progress';
 import {
   SITE_URL,
   SITE_NAME,
@@ -107,6 +108,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <JsonLd data={websiteLd} />
         <JsonLd data={softwareLd} />
+        <ScrollProgress />
         <DownloadProvider>{children}</DownloadProvider>
       </body>
     </html>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Pricing } from '@/views/Pricing';
 import { pageMeta } from '@/lib/seo';
+import { getCountry, currencyForCountry } from '@/lib/geo';
 
 export const metadata: Metadata = pageMeta({
   title: 'Pricing',
@@ -12,8 +13,10 @@ export const metadata: Metadata = pageMeta({
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; cc?: string }>;
 }) {
   const sp = await searchParams;
-  return <Pricing checkoutError={sp.error === 'checkout'} />;
+  // ?cc=IN overrides geo for testing; otherwise resolve from request headers.
+  const currency = currencyForCountry(sp.cc ?? (await getCountry()));
+  return <Pricing checkoutError={sp.error === 'checkout'} currency={currency} />;
 }

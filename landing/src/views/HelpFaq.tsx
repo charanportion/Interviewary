@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Footer } from '../components/Footer';
 import { MinimalHeader } from '../components/MinimalHeader';
+import { Reveal } from '../components/Reveal';
 import { ChevronIcon } from '../components/icons';
 import { CONTACT_EMAIL, PRODUCT_NAME } from '../lib/site';
 
@@ -207,7 +208,7 @@ export function HelpFaq() {
         </div>
 
         {GROUPS.map((group) => (
-          <section key={group.title} className="mt-12">
+          <Reveal as="section" key={group.title} className="mt-12">
             <h2 className="display text-[22px] font-semibold tracking-[-0.015em] text-ink">
               {group.title}
             </h2>
@@ -228,7 +229,7 @@ export function HelpFaq() {
                 </details>
               ))}
             </div>
-          </section>
+          </Reveal>
         ))}
 
         {/* Still stuck */}

@@ -266,10 +266,17 @@ app.post('/v1/checkout', rlCheckout, async (c) => {
   const token = bearer(c.req.header('authorization'));
   const claims = token ? await verifySessionToken(token) : null;
 
+  // Buyer IP drives Polar's local-currency selection. The extension calls us
+  // directly (its request IP is the buyer's), so clientIp works. The landing calls
+  // us server-to-server and forwards the visitor's IP as x-customer-ip.
+  const fwd = c.req.header('x-customer-ip');
+  const customerIp = fwd ? fwd.split(',')[0]!.trim() : clientIp(c);
+
   try {
     const url = await createCheckout(parsed.data.product as ProductKind, {
       email: parsed.data.email,
       customerId: claims?.customerId,
+      customerIp: customerIp && customerIp !== 'unknown' ? customerIp : undefined,
     });
     return c.json({ url } satisfies CheckoutResponse);
   } catch (err) {

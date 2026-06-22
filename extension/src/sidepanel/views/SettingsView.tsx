@@ -9,7 +9,7 @@ import {
   createCheckout,
   cancelSubscription,
 } from '../../lib/billing';
-import { TOPUP_PLANS } from '../../lib/plans';
+import { TOPUP_PLANS, detectCurrency } from '../../lib/plans';
 import type { AppSettings, Entitlement, LlmProvider, ProductKind } from '@interview-copilot/shared';
 
 export function SettingsView() {
@@ -27,12 +27,16 @@ export function SettingsView() {
   const [linkBusy, setLinkBusy] = useState<ProductKind | 'cancel' | null>(null);
 
   const billing = billingConfigured();
+  const currency = detectCurrency();
   const provider = PROVIDERS[draft.provider];
   const byokComplete = hasValidSettings(draft);
   const entitled = !!entitlement && entitlement.status !== 'none';
   // BYOK only for the lifetime build + a lifetime entitlement. Subscription is
   // credits-only, so we hide the keys UI and the mode toggle entirely.
   const byok = byokAvailable(entitlement);
+  // The key fields (Deepgram + LLM) only make sense in your-own-keys mode. In
+  // credits/server mode we run on our keys, so hide them entirely.
+  const showKeys = byok && draft.accountMode === 'byok';
 
   // Save rules: with billing on, an active entitlement is required (hard paywall);
   // BYOK keys are only required when BYOK is available AND the user picked it.
@@ -201,14 +205,14 @@ export function SettingsView() {
                       onClick={() => buyTopup(t.kind)}
                       disabled={linkBusy !== null}
                       className="btn btn-secondary btn-sm flex-col py-1.5! leading-tight"
-                      title={`${t.price} · ${t.credits} credits`}
+                      title={`${t.price[currency]} · ${t.credits} credits`}
                     >
                       {linkBusy === t.kind ? (
                         '…'
                       ) : (
                         <>
                           <span className="text-xs font-semibold">{t.credits.toLocaleString()}</span>
-                          <span className="text-[10px] text-faint">{t.price}</span>
+                          <span className="text-[10px] text-faint">{t.price[currency]}</span>
                         </>
                       )}
                     </button>
@@ -233,14 +237,14 @@ export function SettingsView() {
       {billing && byok && (
         <p className="text-[11px] leading-relaxed text-faint">
           {draft.accountMode === 'server'
-            ? 'Server mode uses our keys and your credits — the keys below are optional (a fallback if you switch to your-own-keys mode).'
+            ? 'Credits mode runs on our keys — switch to your-own-keys mode to enter your own.'
             : 'Your-own-keys mode — fill these in to run interviews without spending credits.'}
         </p>
       )}
 
-      {/* BYOK credentials — only on the lifetime build for a lifetime entitlement.
-          Subscription is credits-only, so these are hidden entirely. */}
-      {byok && (
+      {/* BYOK credentials — only in your-own-keys mode (lifetime build + lifetime
+          entitlement). In credits/server mode and on subscriptions these are hidden. */}
+      {showKeys && (
         <>
           <Field label="Deepgram API key" hint="console.deepgram.com → API keys">
             <input
@@ -311,7 +315,7 @@ export function SettingsView() {
         </span>
       </label>
 
-      {byok && result && (
+      {showKeys && result && (
         <div className="flex flex-col gap-1 text-xs">
           <CheckRow label="Deepgram" ok={result.deepgram.ok} message={result.deepgram.message} />
           <CheckRow label="LLM" ok={result.llm.ok} message={result.llm.message} />
@@ -319,7 +323,7 @@ export function SettingsView() {
       )}
 
       <div className="mt-auto flex flex-col gap-2 pt-2">
-        {byok && (
+        {showKeys && (
           <button
             type="button"
             onClick={handleTest}

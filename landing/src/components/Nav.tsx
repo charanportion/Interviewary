@@ -48,7 +48,7 @@ export function Nav() {
         </div>
 
         <a href="/pricing" className="btn btn-sm btn-primary shrink-0">
-          Get access
+          Get started
         </a>
       </nav>
     </header>

@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "db:init": "tsx src/scripts/initDb.ts",
-    "polar:setup": "tsx src/scripts/setupPolar.ts"
+    "polar:setup": "tsx src/scripts/setupPolar.ts",
+    "polar:reprice": "tsx src/scripts/repricePolar.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.0",

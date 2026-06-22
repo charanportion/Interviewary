@@ -22,14 +22,14 @@ export function Footer({ showCta = true }: { showCta?: boolean }) {
       {showCta && (
         <div className="section py-16 text-center sm:py-20">
           <h2 className="display mx-auto max-w-2xl text-balance text-[28px] font-semibold leading-tight text-ink sm:text-[36px]">
-            Give your next technical screen a second set of ears.
+            Stop guessing whether an answer was any good.
           </h2>
           <p className="mx-auto mt-4 max-w-lg text-[15.5px] text-ink-soft">
-            Pick a plan, activate your license, and run a sharper interview today.
+            Pick a plan, paste your license key, and run a sharper interview today.
           </p>
           <div className="mt-7 flex justify-center">
             <a href="/pricing" className="btn btn-lg btn-primary">
-              See plans &amp; pricing
+              See plans
             </a>
           </div>
         </div>
